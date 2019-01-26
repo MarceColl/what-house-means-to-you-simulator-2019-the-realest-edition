@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include <string>
 #include <queue>
@@ -9,6 +10,7 @@
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
 
+#include "RealLifeGame.h"
 #define W_WIDTH 800
 #define W_HEIGHT 600
 
@@ -16,6 +18,7 @@ enum Input {
 	LEFT,
 	RIGHT,
 	ACTION,
+	TOGGLE,
 	ARCADE_QUIT,
 
 	// Always at the end
@@ -23,6 +26,7 @@ enum Input {
 };
 
 bool input_array[INPUT_COUNT];
+bool once_array[INPUT_COUNT];
 
 typedef enum Game {
 	REAL_LIFE,
@@ -83,7 +87,8 @@ struct Player {
 		this->high_score = 0;
 
 		this->curr_game = ARCADE;
-
+		
+		this->real_life_pos = sf::Vector2f(200.0, 400.0);
 		this->arcade_pos = sf::Vector2f(W_WIDTH/2, 100.0);
 	}
 };
@@ -344,15 +349,24 @@ int main() {
 			else if (event.type == sf::Event::KeyPressed) {
 				if (event.key.code == sf::Keyboard::Left) {
 					input_array[LEFT] = true;
+					once_array[LEFT] = true;
 				}
 				else if (event.key.code == sf::Keyboard::Right) {
 					input_array[RIGHT] = true;
+					once_array[RIGHT] = true;
 				}
 				else if (event.key.code == sf::Keyboard::X) {
 					input_array[ACTION] = true;
+					once_array[ACTION] = true;
 				}
 				else if (event.key.code == sf::Keyboard::Q) {
 					input_array[ARCADE_QUIT] = true;
+					once_array[ARCADE_QUIT] = true;
+				}
+				else if (event.key.code == sf::Keyboard::Z) {
+					input_array[TOGGLE] = true;
+					once_array[TOGGLE] = true;
+
 				}
 			}
 			else if (event.type == sf::Event::KeyReleased) {
@@ -367,6 +381,9 @@ int main() {
 				}
 				else if (event.key.code == sf::Keyboard::Q) {
 					input_array[ARCADE_QUIT] = false;
+				}
+				else if (event.key.code == sf::Keyboard::Z) {
+					input_array[TOGGLE] = false;
 				}
 			}
         }
@@ -390,10 +407,12 @@ int main() {
 			window.draw(sc_sprite, &bloom);
 		}
 
+		for (int i = 0; i < INPUT_COUNT; i++) {
+			once_array[i] = false;
+		}
+
         window.display();
     }
 
     return 0;
 }
-
-
