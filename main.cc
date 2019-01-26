@@ -91,6 +91,36 @@ struct Player {
 
 struct SoundPlayer {
 	std::unordered_map<std::string, sf::Sound> sound;
+	std::unordered_map<std::string, sf::SoundBuffer> buffers;
+
+	float immersion;
+
+ 	SoundPlayer() {
+		this->add_track("intro_track_arcade", "./Tracks/Intro Arcade.ogg");
+		this->immersion = 0.0f;
+	}
+
+	void add_track(std::string name, std::string file_path) {
+		sf::Sound sound;
+
+		if (this->buffers.count(file_path) == 0) {
+			sf::SoundBuffer buffer;
+			buffer.loadFromFile(file_path);
+			this->buffers[file_path] = buffer;
+		}
+
+		sound.setBuffer(this->buffers[file_path]);
+		this->sound[name] = sound;
+	}
+
+	void play_from_arcade(std::string name) {
+		this->sound[name].play();
+	}
+
+	void play_from_real_life(std::string name) {
+		this->sound[name].setVolume(100.0 - this->immersion);
+		this->sound[name].play();
+	}
 };
 
 struct RealLifeGame {
@@ -163,9 +193,11 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window): window(window),
 	this->actionables[1].action_message = "Press 'F' to pay bills";
 	this->actionables[1].position.x = 325;
 	this->actionables[1].position.y = 400;
+
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
 		printf("The font was not found!\n");
 	}
+
 	this->debug_text.setFont(this->action_font);
 	this->debug_text.setPosition(0, window.getSize().y-50);
 	this->action_text.setFont(this->action_font);
@@ -191,8 +223,7 @@ void RealLifeGame::update_debug(){
 	this->debug_text.setString(buffAsStdStr);
 }
 
-void RealLifeGame::update(sf::Time time) {
-}
+void RealLifeGame::update(sf::Time time) {}
 
 void RealLifeGame::update_active(sf::Time time) {
 	/// ACTIONABLES
@@ -287,11 +318,18 @@ struct ArcadeGame {
 	bool on_platform;
 	bool dj_avail;
 
+	bool menu;
+
 	int score;
 
 	float ppb;
 
 	bool reached_platforms;
+
+	sf::Font action_font;
+	sf::Text reachables_text;
+	sf::Text action_text;
+	sf::Text debug_text;
 
 	sf::Vector2f speed;
 
@@ -306,6 +344,19 @@ struct ArcadeGame {
 
 	ArcadeGame(Player *p, sf::RenderWindow &window): window(window), lines(sf::Lines, 2) {
 		this->player = p;
+		this->menu = true;
+
+		if (!this->action_font.loadFromFile("pixelart.ttf")) {
+			printf("The font was not found!\n");
+		}
+
+		this->debug_text.setFont(this->action_font);
+		this->debug_text.setPosition(0, window.getSize().y-50);
+
+		this->action_text.setFont(this->action_font);
+		this->action_text.setFillColor(sf::Color::White);
+		this->action_text.setPosition(400, window.getSize().y-50);
+
 		this->init();
 	}
 
@@ -383,7 +434,6 @@ struct ArcadeGame {
 				this->on_platform = false;
 			}
 
-
 			sf::Vector2f *pos = &this->player->arcade_pos;
 
 			if (this->speed.y > 0 &&
@@ -411,12 +461,25 @@ struct ArcadeGame {
 			pos->y += this->speed.y * dt.asSeconds();
 		}
 
+		char buff[100];
+		snprintf(buff, sizeof(buff), "%d", this->score);
+		std::string buffAsStdStr = buff;
+		this->debug_text.setString(buffAsStdStr);
+
+		snprintf(buff, sizeof(buff), "HS %d", this->player->high_score);
+		buffAsStdStr = buff;
+		this->action_text.setString(buffAsStdStr);
+
 		// Let it wiggle
 		this->player_sprite.setScale(
 				1.0 + sin(this->time*10)*0.2, 
 				1.0 + cos(this->time*10)*0.2);
 
 		if (this->player->arcade_pos.y > W_HEIGHT) {
+			if (this->score > this->player->high_score) {
+				this->player->high_score = this->score;
+			}
+
 			this->init();
 		}
 	}
@@ -475,7 +538,8 @@ struct ArcadeGame {
 		this->player_sprite.setPosition(player->arcade_pos);
 		target.draw(this->player_sprite);
 
-		// window.draw(this->lines);
+		target.draw(this->debug_text);
+		target.draw(this->action_text);
 	}
 };
 
@@ -484,6 +548,8 @@ int main() {
 	Player player = Player();
 	ArcadeGame ag = ArcadeGame(&player, window);
 	RealLifeGame rlg = RealLifeGame(&player, window);
+
+	SoundPlayer sp = SoundPlayer();
 
 	sf::RenderTexture texture;
 	texture.create(W_WIDTH, W_HEIGHT);
@@ -497,6 +563,8 @@ int main() {
 
 	sf::Shader bloom;
 	bloom.loadFromFile("bloom.glsl", sf::Shader::Fragment);
+
+	sp.play_from_arcade("intro_track_arcade");
 
     while (window.isOpen())
     {
