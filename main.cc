@@ -139,8 +139,15 @@ struct RealLifeGame {
 	std::vector<Actionable> actionables;
 	std::vector<Actionable> reachable_actionables;
 	int selected_reachable;
+	
+	sf::Texture scene_texture;
+	sf::Sprite scene_sprite;
+
+	sf::Texture player_texture;
+	sf::Sprite player_sprite;
+
 	sf::RenderWindow &window;
-	sf::RectangleShape player_sprite;
+
 	sf::Font action_font;
 	sf::Text reachables_text;
 	sf::Text action_text;
@@ -174,8 +181,22 @@ bool RealLifeGame::Actionable::isReachable(float x) {
 
 RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window): window(window), actionables(2) {
 	this->player = p;
-	this->player_sprite = sf::RectangleShape(sf::Vector2f(20.0, 20.0));
-	this->player_sprite.setFillColor(sf::Color(255,0,0));
+	if (!this->scene_texture.loadFromFile("Images/escenario.png")) {
+		printf("The scene was not found!\n");
+	}
+	sf::Vector2u w_size = window.getSize();
+	sf::Vector2u st_size = this->scene_texture.getSize();
+	this->scene_sprite.setTexture(this->scene_texture);
+	this->scene_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
+	this->player->real_life_pos.x = w_size.x *0.4;
+	this->player->real_life_pos.y = w_size.y *0.7;
+	if (!this->player_texture.loadFromFile("Images/sit/sit.png")) {
+		printf("The scene was not found!\n");
+	}
+	this->player_sprite.setTexture(this->player_texture);
+	this->player_sprite.setTextureRect(sf::IntRect(0, 0, 15, 30));
+	this->player_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
+	this->player_sprite.setOrigin(15/float(2), 30/float(2));
 	this->mov_speed = 0.1;
 	this->action_reach = 50;
 	this->debug = true;
@@ -199,7 +220,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window): window(window),
 	}
 
 	this->debug_text.setFont(this->action_font);
-	this->debug_text.setPosition(0, window.getSize().y-50);
+	this->debug_text.setPosition(0, w_size.y-50);
 	this->action_text.setFont(this->action_font);
 	this->action_text.setFillColor(sf::Color::White);
 	this->reachables_text.setFont(this->action_font);
@@ -256,6 +277,8 @@ void RealLifeGame::update_active(sf::Time time) {
 		snprintf(buff, sizeof(buff), "%d / %d", this->selected_reachable, this->reachable_actionables.size());
 		std::string buffAsStdStr = buff;
 		this->reachables_text.setString(buffAsStdStr);
+	} else {
+		this->reachables_text.setString("");
 	}
 
 	/// PROCESS INPUT
@@ -283,7 +306,9 @@ void RealLifeGame::update_active(sf::Time time) {
 }
 
 void RealLifeGame::render(){
+	this->window.draw(this->scene_sprite);
 	this->window.draw(this->action_text);
+	this->window.draw(this->reachables_text);
 	this->window.draw(this->player_sprite);
 
 	if (this->debug) {
