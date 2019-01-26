@@ -136,8 +136,8 @@ struct ArcadeGame {
 
 	ArcadeGame(Player *p, sf::RenderWindow &window): window(window), lines(sf::Lines, 2) {
 		this->player = p;
-		this->current_beat = 0.0;
 		this->bpm = 1200.0;
+		this->current_beat = -1.3 * (this->bpm/60);
 		this->paused = false;
 		this->on_platform = false;
 		this->ppb = 25;
@@ -149,7 +149,7 @@ struct ArcadeGame {
 		this->dj_avail = true;
 		this->score = 0;
 
-		this->reached_platforms = true;
+		this->reached_platforms = false;
 
 		this->lines[0] = sf::Vector2f(W_WIDTH/2.0, 0);
 		this->lines[1] = sf::Vector2f(W_WIDTH/2.0, W_HEIGHT);
@@ -157,7 +157,7 @@ struct ArcadeGame {
 		int offset_beat = 0;
 		for (int i = 0; i < 50; ++i) {
 			int beats = std::rand()%4 + 1;
-			int height = 100 + std::rand()%4 * 50;
+			int height = 200 + std::rand()%4 * 50;
 
 			for (int j = 0; j < beats; ++j) {
 				Platform plat = {
@@ -189,21 +189,26 @@ struct ArcadeGame {
 		
 		this->time += dt.asSeconds();
 
-		this->current_beat += (this->bpm/60)*dt.asSeconds();
-
-		if (this->current_beat >= this->platforms[this->curr_platform].start + this->platforms[this->curr_platform].duration) {
-			this->curr_platform += 1; 
-
-			if (this->curr_platform >= this->platforms.size()) {
-				this->curr_platform = 0;
-				this->current_beat = 0.0;
-				this->bpm += 200;
-			}
-
-			this->on_platform = false;
+		if (this->time > 1.0 && !this->reached_platforms) {
+			this->reached_platforms = true;
 		}
 
+		this->current_beat += (this->bpm/60)*dt.asSeconds();
+
 		if (this->reached_platforms) {
+			if (this->current_beat >= this->platforms[this->curr_platform].start + this->platforms[this->curr_platform].duration) {
+				this->curr_platform += 1; 
+
+				if (this->curr_platform >= this->platforms.size()) {
+					this->curr_platform = 0;
+					this->current_beat = 0.0;
+					this->bpm += 200;
+				}
+
+				this->on_platform = false;
+			}
+
+
 			sf::Vector2f *pos = &this->player->arcade_pos;
 
 			if (this->speed.y > 0 &&
@@ -239,7 +244,7 @@ struct ArcadeGame {
 
 	void update(sf::Time dt) {}
 
-	void render() {
+	void render(sf::RenderTarget &target) {
 		int size = this->platforms.size();
 		for (int i = this->curr_platform; i < size * 2; ++i) {
 			Platform *p = &this->platforms[i%size];
@@ -258,36 +263,38 @@ struct ArcadeGame {
 			this->platform_sprite.setFillColor(sf::Color(255, 0, 255));
 			this->platform_sprite.setScale(p->duration * this->ppb, 1);
 
-			window.draw(this->platform_sprite);
+			target.draw(this->platform_sprite);
 		}
 
-		for (int i = 0; i < size * 2; ++i) {
-			Platform *p = &this->platforms[(this->curr_platform - i)%size];
+		if (this->reached_platforms) {
+			for (int i = 0; i < size * 2; ++i) {
+				Platform *p = &this->platforms[(this->curr_platform - i)%size];
 
-			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+				float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
 
-			if (i > this->curr_platform) {
-				x -= size * this->ppb;
+				if (i > this->curr_platform) {
+					x -= size * this->ppb;
+				}
+
+				if (x < -100) {
+					break;
+				}
+
+				this->platform_sprite.setPosition(sf::Vector2f(x, p->height));
+				if (p->played) {
+					this->platform_sprite.setFillColor(sf::Color(255, 255, 0));
+				}
+				else {
+					this->platform_sprite.setFillColor(sf::Color(255, 0, 255));
+				}
+				this->platform_sprite.setScale(p->duration * this->ppb, 1);
+
+				target.draw(this->platform_sprite);
 			}
-
-			if (x < -100) {
-				break;
-			}
-
-			this->platform_sprite.setPosition(sf::Vector2f(x, p->height));
-			if (p->played) {
-				this->platform_sprite.setFillColor(sf::Color(255, 255, 0));
-			}
-			else {
-				this->platform_sprite.setFillColor(sf::Color(255, 0, 255));
-			}
-			this->platform_sprite.setScale(p->duration * this->ppb, 1);
-
-			window.draw(this->platform_sprite);
 		}
 
 		this->player_sprite.setPosition(player->arcade_pos);
-		window.draw(this->player_sprite);
+		target.draw(this->player_sprite);
 
 		// window.draw(this->lines);
 	}
@@ -299,7 +306,18 @@ int main() {
 	ArcadeGame ag = ArcadeGame(&player, window);
 	RealLifeGame rlg = RealLifeGame(&player, window);
 
+	sf::RenderTexture texture;
+	texture.create(W_WIDTH, W_HEIGHT);
+
+	sf::Sprite sc_sprite(texture.getTexture());
+	sc_sprite.setOrigin(sf::Vector2f(W_WIDTH/2, W_HEIGHT/2));
+	sc_sprite.setScale(sf::Vector2f(1.0, -1.0));
+	sc_sprite.setPosition(sf::Vector2f(W_WIDTH/2, W_HEIGHT/2));
+
 	sf::Clock deltaClock;
+
+	sf::Shader bloom;
+	bloom.loadFromFile("bloom.glsl", sf::Shader::Fragment);
 
     while (window.isOpen())
     {
@@ -351,7 +369,11 @@ int main() {
 		else {
 			rlg.update(dt);
 			ag.update_active(dt);
-			ag.render();
+
+			texture.clear();
+		
+			ag.render(texture);
+			window.draw(sc_sprite, &bloom);
 		}
 
         window.display();
