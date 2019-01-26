@@ -500,8 +500,6 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->player_sprite.setTextureRect(this->player_animation.get_rekt());
 	this->player_sprite.setPosition(this->player->real_life_pos);
 
-
-	this->player_animation.to_string();
 	if (this->debug) {
 		this->update_debug();
 	}
