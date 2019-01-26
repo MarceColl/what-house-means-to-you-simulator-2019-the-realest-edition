@@ -94,7 +94,7 @@ struct SoundPlayer {
 };
 
 struct RealLifeGame {
-	struct Actionable{
+	struct Actionable {
 		int id;
 		std::string action_message;
 		sf::Vector2f position;
@@ -102,6 +102,68 @@ struct RealLifeGame {
 		int reach;
 
 		bool isReachable(float x);
+	};
+
+	struct Animation {
+		int length;
+		sf::Vector2i rect_size;
+		int current_frame;
+		int frame_length;
+		bool loop;
+		bool inverted;
+		float elapsed_since_last;
+
+		Animation() {
+			this->inverted = false;
+			this->loop = true;
+			this->frame_length = 1000;
+			this->current_frame = 0;
+		}
+
+		sf::IntRect get_rekt() {
+			return sf::IntRect(
+				this->rect_size.x*this->current_frame,
+				0,
+				rect_size.x,
+				rect_size.y
+			);
+		}
+
+		void update(sf::Time t) {
+			this->elapsed_since_last += t.asMilliseconds();
+			if (this->elapsed_since_last > this->frame_length) {
+				this->elapsed_since_last = this->frame_length - this->elapsed_since_last;
+				if (this->inverted) {
+					this->current_frame--;
+				} else {
+					this->current_frame++;
+				}
+				
+				if (this->loop) {
+					this->current_frame = this->current_frame % this->length;
+					if (this->current_frame < 0 ) {
+						this->current_frame = this->length-1;
+					}
+				}
+				else if (this->current_frame <= 0) {
+					this->current_frame = 0;
+				}
+				else if (this->current_frame >= this->length) {
+					this->current_frame--;
+				}
+			}
+		}
+
+		void to_string() {
+			printf("Animation: \ncurrent frame: %d\nloop: %d\ninverted: %d\n", this->current_frame, this->loop, this->inverted);
+		}
+	};
+
+	enum PlayerState {
+		SEATED,
+		STANDING,
+		IDLE,
+		WALKING
 	};
 
 	bool debug;
@@ -113,8 +175,13 @@ struct RealLifeGame {
 	sf::Texture scene_texture;
 	sf::Sprite scene_sprite;
 
-	sf::Texture player_texture;
+	sf::Texture player_texture_seated;
+	sf::Texture player_texture_walking;
+	sf::Texture player_texture_seated_night;
+	sf::Texture player_texture_walking_night;
 	sf::Sprite player_sprite;
+	Animation player_animation;
+	PlayerState player_state;
 
 	sf::RenderWindow &window;
 
@@ -151,25 +218,41 @@ bool RealLifeGame::Actionable::isReachable(float x) {
 
 RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window): window(window), actionables(2) {
 	this->player = p;
-	if (!this->scene_texture.loadFromFile("Images/escenario.png")) {
+	if (!this->scene_texture.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
 	}
 	sf::Vector2u w_size = window.getSize();
 	sf::Vector2u st_size = this->scene_texture.getSize();
 	this->scene_sprite.setTexture(this->scene_texture);
 	this->scene_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
-	this->player->real_life_pos.x = w_size.x *0.4;
-	this->player->real_life_pos.y = w_size.y *0.7;
-	if (!this->player_texture.loadFromFile("Images/sit/sit.png")) {
-		printf("The scene was not found!\n");
+	this->player->real_life_pos.x = w_size.x *0.65;
+	this->player->real_life_pos.y = w_size.y *0.66;
+	if (!this->player_texture_seated.loadFromFile("Images/sprites_finals/sit.png")) {
+		printf("sit not found!\n");
 	}
-	this->player_sprite.setTexture(this->player_texture);
-	this->player_sprite.setTextureRect(sf::IntRect(0, 0, 15, 30));
+	if (!this->player_texture_seated_night.loadFromFile("Images/sprites_finals/sit_nit.png")) {
+		printf("sit nit not found!\n");
+	}
+	if (!this->player_texture_walking.loadFromFile("Images/sprites_finals/walk.png")) {
+		printf("walk not found!\n");
+	}
+	if (!this->player_texture_walking_night.loadFromFile("Images/sprites_finals/walk_nit.png")) {
+		printf("awlk nit!\n");
+	}
+	this->player_state = SEATED;
+	this->player_animation.length = 4;
+	this->player_animation.current_frame = 3;
+	this->player_animation.loop = false;
+	this->player_animation.frame_length = 400;
+	this->player_animation.rect_size = sf::Vector2i(15, 30);
+	this->player_sprite.setTexture(this->player_texture_seated);
+	this->player_sprite.setTextureRect(this->player_animation.get_rekt());
 	this->player_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player_sprite.setOrigin(15/float(2), 30/float(2));
+	
 	this->mov_speed = 0.1;
 	this->action_reach = 50;
-	this->debug = true;
+	this->debug = false;
 
 	this->selected_reachable = 0;
 	this->actionables[0].id = 0;
@@ -218,57 +301,107 @@ void RealLifeGame::update(sf::Time time) {
 void RealLifeGame::update_active(sf::Time time) {
 	/// ACTIONABLES
 	this->reachable_actionables.clear();
-	for (auto actionable : this->actionables) {
-		if(actionable.isReachable(this->player->real_life_pos.x)) {
-			this->reachable_actionables.push_back(actionable);
+	// IF DUDE IS NOT SITTING, LET HIM DO SHITE
+	if(this->player_state != SEATED) {
+		for (auto actionable : this->actionables) {
+			if(actionable.isReachable(this->player->real_life_pos.x)) {
+				this->reachable_actionables.push_back(actionable);
+			}
 		}
-	}
-	// Keep selected in reachables
-	if (this->reachable_actionables.size() > 0) {
-		this->selected_reachable = this->selected_reachable % this->reachable_actionables.size();
-	} 
-	else {
-		this->selected_reachable = -1;
-	}
-	// Update reachable text
-	if (this->selected_reachable >= 0) {
-		Actionable a = this->reachable_actionables[this->selected_reachable];
-		float width = this->action_text.getLocalBounds().width;
-		this->action_text.setPosition(a.position.x - (width/2.0), a.position.y-50);
-		this->action_text.setString(a.action_message);
+		// Keep selected in reachables
+		if (this->reachable_actionables.size() > 0) {
+			this->selected_reachable = this->selected_reachable % this->reachable_actionables.size();
+		} 
+		else {
+			this->selected_reachable = -1;
+		}
+		// Update reachable text
+		if (this->selected_reachable >= 0) {
+			Actionable a = this->reachable_actionables[this->selected_reachable];
+			float width = this->action_text.getLocalBounds().width;
+			this->action_text.setPosition(a.position.x - (width/2.0), a.position.y-50);
+			this->action_text.setString(a.action_message);
+		} else {
+			this->action_text.setString("");
+		}
+
+		// Update helper for multiple reachables
+		if (this->reachable_actionables.size() > 1) {
+			char buff[100];
+			snprintf(buff, sizeof(buff), "%d / %d", this->selected_reachable, this->reachable_actionables.size());
+			std::string buffAsStdStr = buff;
+			this->reachables_text.setString(buffAsStdStr);
+		} else {
+			this->reachables_text.setString("");
+		}
+
 	} else {
-		this->action_text.setString("");
+		// IF DUDE IS SITING, nope
+		this->action_text.setPosition(this->player->real_life_pos.x - 50, this->player->real_life_pos.y - 50);
+		this->reachables_text.setString("Press 'x' to stand");
 	}
 
-	// Update helper for multiple reachables
-	if (this->reachable_actionables.size() > 1) {
-		char buff[100];
-		snprintf(buff, sizeof(buff), "%d / %d", this->selected_reachable, this->reachable_actionables.size());
-		std::string buffAsStdStr = buff;
-		this->reachables_text.setString(buffAsStdStr);
-	} else {
-		this->reachables_text.setString("");
-	}
 
 	/// PROCESS INPUT
 	if (input_array[LEFT]) {
-		this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed;
+		//DONT MOVE IF SEATED
+		if(this->player_state == IDLE) {
+			this->player_state = WALKING;
+			this->player_animation.inverted = false;
+			this->player_animation.loop = true;
+		}
+		if (this->player_state == WALKING) {
+			this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed;
+		}
 	}
 	else if (input_array[RIGHT]) {
-		this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed;
+		//DONT MOVE IF SEATED
+		if(this->player_state == IDLE) {
+			this->player_state = WALKING;
+			this->player_animation.inverted = false;
+			this->player_animation.loop = true;
+		}
+		if (this->player_state == WALKING) {
+			this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed;
+		}
+	} else {
+		if(this->player_state == WALKING) { 
+			this->player_state = IDLE;
+			this->player_animation.inverted = true;
+			this->player_animation.loop = false;
+			this->player_animation.current_frame = 0;
+		}
 	}
-	
 	if (once_array[ACTION]) {
-		if (this->selected_reachable >= 0) {
-			Actionable a = this->reachable_actionables[this->selected_reachable];
-			a.action(this, a);
+		if (this->player_state == IDLE || this->player_state == WALKING) {
+			if (this->selected_reachable >= 0) {
+				Actionable a = this->reachable_actionables[this->selected_reachable];
+				a.action(this, a);
+			}
+		} else if (this->player_state == SEATED) {
+			this->player_state = STANDING;
+			this->player_animation.inverted = true;
 		}
 	}
 	else if (once_array[TOGGLE]) {
 		this->selected_reachable = (this->selected_reachable+1) % this->reachable_actionables.size();
 	}
+	//APPLY PLAYER STATE TO ANIMATION (maybe bad idea every tick?)
+	if(this->player_state == SEATED || this->player_state == STANDING) {
+		this->player_sprite.setTexture(this->player_texture_seated);
+		if (this->player_state == STANDING && this->player_animation.current_frame == 0) {
+			this->player_state = IDLE;
+			this->player_sprite.setTexture(this->player_texture_walking);
+		}
+	} else {
+		this->player_sprite.setTexture(this->player_texture_walking);
+	}
+	this->player_animation.update(time);
+	this->player_sprite.setTextureRect(this->player_animation.get_rekt());
 	this->player_sprite.setPosition(this->player->real_life_pos);
 
+
+	this->player_animation.to_string();
 	if (this->debug) {
 		this->update_debug();
 	}
