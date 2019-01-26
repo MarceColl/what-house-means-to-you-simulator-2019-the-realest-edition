@@ -74,13 +74,16 @@ struct Player {
 		this->high_score = 0;
 
 		this->curr_game = ARCADE;
+
+		this->arcade_pos = sf::Vector2f(200.0, 400.0);
 	}
 };
 
 struct RealLifeGame {
 	Player *player;
+	sf::RenderWindow &window;
 
-	RealLifeGame(Player *p) {
+	RealLifeGame(Player *p, sf::RenderWindow &window): window(window) {
 		this->player = p;
 	}
 
@@ -93,14 +96,50 @@ struct RealLifeGame {
 };
 
 struct ArcadeGame {
-	Player *player;
+	struct Platform {
+		float start;
+		int height;
+		float duration;
+	};
 
-	ArcadeGame(Player *p) {
+	Player *player;
+	sf::RenderWindow &window;
+
+	float current_beat;
+	float bpm;
+	bool paused;
+
+	sf::RectangleShape player_sprite;
+	sf::RectangleShape platform_sprite;
+
+	std::vector<Platform> platforms;
+
+	int curr_platform;
+
+	ArcadeGame(Player *p, sf::RenderWindow &window): window(window) {
 		this->player = p;
+		this->current_beat = 0.0;
+		this->bpm = 10.0;
+		this->paused = false;
+		this->player_sprite = sf::RectangleShape(sf::Vector2f(20.0, 20.0));
+		this->platform_sprite = sf::RectangleShape(sf::Vector2f(20.0, 20.0));
+		this->curr_platform = 0;
+
+		for (int i = 0; i < 50; ++i) {
+			Platform plat = {
+				.start = i * 100.0,
+				.height = std::rand()%100 * 50,
+				.duration = 9.0
+			};
+			platforms.push_back(plat);
+		}
 	}
 
 	void update_active() {
-		if (input_array[ARCADE_QUIT]) {
+		if (input_array[ACTION]) {
+			// JUMP
+		}
+		else if (input_array[ARCADE_QUIT]) {
 			this->player->curr_game = REAL_LIFE;
 			printf("Exited arcade game\n");
 		}
@@ -108,14 +147,25 @@ struct ArcadeGame {
 
 	void update() {}
 
-	void render() {}
+	void render() {
+		for (int i = 0; i < this->platforms.size(); ++i) {
+			Platform *p = &this->platforms[i];
+			this->platform_sprite.setPosition(sf::Vector2f(this->platforms[i].start, p->height));
+			this->platform_sprite.setFillColor(sf::Color(255, 0, 255));
+			this->platform_sprite.setScale(p->duration, 1);
+			window.draw(this->platform_sprite);
+		}
+
+		this->player_sprite.setPosition(player->arcade_pos);
+		window.draw(this->player_sprite);
+	}
 };
 
 int main() {
     sf::RenderWindow window(sf::VideoMode(800, 600), "SFML works!");
 	Player player = Player();
-	ArcadeGame ag = ArcadeGame(&player);
-	RealLifeGame rlg = RealLifeGame(&player);
+	ArcadeGame ag = ArcadeGame(&player, window);
+	RealLifeGame rlg = RealLifeGame(&player, window);
 
     while (window.isOpen())
     {
@@ -173,4 +223,5 @@ int main() {
 
     return 0;
 }
+
 
