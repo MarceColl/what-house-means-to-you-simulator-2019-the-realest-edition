@@ -259,6 +259,7 @@ struct RealLifeGame {
 	enum PlayerState {
 		SEATED,
 		STANDING,
+		SEATING,
 		IDLE,
 		WALKING
 	};
@@ -273,6 +274,13 @@ struct RealLifeGame {
 	
 	sf::Texture scene_texture;
 	sf::Sprite scene_sprite;
+
+	sf::Texture vr_texture;
+	sf::Sprite vr_sprite;
+	float vr_top_pos;
+	float vr_bottom_pos;
+	float vr_pos_y;
+
 
 	sf::Texture player_texture_seated;
 	sf::Texture player_texture_walking;
@@ -309,13 +317,14 @@ struct RealLifeGame {
 /// ACTION CALLBACKS
 ////////////////////
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
 
 bool RealLifeGame::Actionable::isReachable(float x) {
 	return abs(x - this->position.x) < this->reach;
 }
 
-RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(2), sp(sp) {
+RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(0), sp(sp) {
 	this->player = p;
 	if (!this->scene_texture.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
@@ -338,6 +347,9 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	if (!this->player_texture_walking_night.loadFromFile("Images/sprites_finals/walk_nit.png")) {
 		printf("awlk nit!\n");
 	}
+	if (!this->vr_texture.loadFromFile("Images/vr.png")) {
+		printf("vr!\n");
+	}
 	this->player_state = SEATED;
 	this->player_animation.length = 4;
 	this->player_animation.current_frame = 3;
@@ -349,23 +361,36 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->player_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player_sprite.setOrigin(15/float(2), 30/float(2));
 	
+
+	this->vr_sprite.setTexture(this->vr_texture);
+	this->vr_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
+	this->vr_pos_y =  w_size.y / float(st_size.y);
+	this->vr_bottom_pos = 0;
+	this->vr_top_pos = -100;
+
 	this->mov_speed = 0.1;
 	this->action_reach = 50;
 	this->debug = false;
 
 	this->selected_reachable = 0;
+	/*
 	this->actionables[0].id = 0;
 	this->actionables[0].reach = this->action_reach;
 	this->actionables[0].action = pay_respects;
 	this->actionables[0].action_message = "Press 'F' to pay respects";
 	this->actionables[0].position.x = 300;
 	this->actionables[0].position.y = 400;
-	this->actionables[1].id = 1;
-	this->actionables[1].reach = this->action_reach;
-	this->actionables[1].action = pay_bills;
-	this->actionables[1].action_message = "Press 'F' to pay bills";
-	this->actionables[1].position.x = 325;
-	this->actionables[1].position.y = 400;
+	*/
+	Actionable couch;
+	couch.id = 0;
+	couch.reach = this->action_reach;
+	couch.action = sit;
+	couch.action_message = "Press 'x' to sit on the couch";
+	couch.position.x = w_size.x *0.65;
+	couch.position.y = w_size.x *0.66;
+
+	this->actionables.push_back(couch);
+	
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
 		printf("The font was not found!\n");
@@ -403,6 +428,10 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->reachable_actionables.clear();
 	// IF DUDE IS NOT SITTING, LET HIM DO SHITE
 	if(this->player_state != SEATED) {
+		//VR headset
+		if (this->vr_pos_y > this->vr_top_pos) {
+			this->vr_pos_y -= time.asMilliseconds();
+		}
 		for (auto actionable : this->actionables) {
 			if(actionable.isReachable(this->player->real_life_pos.x)) {
 				this->reachable_actionables.push_back(actionable);
@@ -436,9 +465,14 @@ void RealLifeGame::update_active(sf::Time time) {
 		}
 
 	} else {
+		
+		if (this->vr_pos_y < this->vr_bottom_pos) {
+			this->vr_pos_y += time.asMilliseconds();
+		}
+
 		// IF DUDE IS SITING, nope
-		this->action_text.setPosition(this->player->real_life_pos.x - 50, this->player->real_life_pos.y - 50);
-		this->reachables_text.setString("Press 'x' to stand");
+		this->action_text.setPosition(this->player->real_life_pos.x - 250, this->player->real_life_pos.y - 200);
+		this->action_text.setString("Press 'x' to stand");
 	}
 
 
@@ -487,11 +521,14 @@ void RealLifeGame::update_active(sf::Time time) {
 		this->selected_reachable = (this->selected_reachable+1) % this->reachable_actionables.size();
 	}
 	//APPLY PLAYER STATE TO ANIMATION (maybe bad idea every tick?)
-	if(this->player_state == SEATED || this->player_state == STANDING) {
+	if(this->player_state == SEATED || this->player_state == STANDING || this->player_state == SEATING) {
 		this->player_sprite.setTexture(this->player_texture_seated);
 		if (this->player_state == STANDING && this->player_animation.current_frame == 0) {
 			this->player_state = IDLE;
 			this->player_sprite.setTexture(this->player_texture_walking);
+		}
+		if(this->player_state == SEATING && this->player_animation.current_frame == 3) {
+			this->player_state = SEATED;
 		}
 	} else {
 		this->player_sprite.setTexture(this->player_texture_walking);
@@ -500,6 +537,16 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->player_sprite.setTextureRect(this->player_animation.get_rekt());
 	this->player_sprite.setPosition(this->player->real_life_pos);
 
+	float x = 0;
+	sf::Vector2u w_size = window.getSize();
+	if (this->player_state == SEATED) {
+		x = this->player->real_life_pos.x - w_size.x*0.66;
+	} else {
+		x = this->vr_sprite.getPosition().x;
+	}
+
+	this->vr_sprite.setPosition(x, this->vr_pos_y);
+
 	if (this->debug) {
 		this->update_debug();
 	}
@@ -507,9 +554,10 @@ void RealLifeGame::update_active(sf::Time time) {
 
 void RealLifeGame::render(){
 	this->window.draw(this->scene_sprite);
-	this->window.draw(this->action_text);
-	this->window.draw(this->reachables_text);
 	this->window.draw(this->player_sprite);
+	this->window.draw(this->reachables_text);
+	this->window.draw(this->action_text);
+	this->window.draw(this->vr_sprite);
 
 	if (this->debug) {
 		this->window.draw(this->debug_text);
@@ -523,6 +571,13 @@ void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a){
 
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	printf("Respects payed \n");
+}
+void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player_state = RealLifeGame::PlayerState::SEATING;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->action_text.setString("");
 }
 
 struct ArcadeGame {
