@@ -3,9 +3,12 @@
 
 #include <SFML/Graphics.hpp>
 
+struct Player;
+
 struct ArcadeGame {
 	ArcadeGame();
 
+	void set_player(Player *p);
 	void update_active();
 	void update();
 

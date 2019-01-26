@@ -6,6 +6,7 @@
 struct RealLifeGame {
 	RealLifeGame();
 
+	void set_player(Player *p);
 	void update_active();
 	void update();
 

@@ -1,3 +1,4 @@
+#include "player.h"
 #include "arcade_game.h"
 
 ArcadeGame::ArcadeGame() {
@@ -15,6 +16,11 @@ ArcadeGame::update() {
 
 void 
 ArcadeGame::render() {
+	// Update ranking, etc etc
+}
+
+void 
+ArcadeGame::set_player(Player *p) {
 	// Update ranking, etc etc
 }
 

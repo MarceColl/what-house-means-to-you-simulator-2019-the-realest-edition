@@ -2,38 +2,14 @@
 
 #include "input.h"
 
+#include "player.h"
 #include "real_life_game.h"
 #include "arcade_game.h"
 
 #include <SFML/Graphics.hpp>
 
-typedef enum Game {
-	REAL_LIFE,
-	ARCADE
-} Game;
 
-struct Player {
-	// 0.0 -> 1.0
-	float pee_need;
-
-	// 0.0 -> 1.0
-	float hunger_need;
-
-	// 0.0 -> 1.0
-	float hygiene_need;
-
-	int curr_game_points;
-	int high_score;
-
-	Game curr_game;
-
-	Player() {
-		
-	}
-};
-
-int main()
-{
+int main() {
     sf::RenderWindow window(sf::VideoMode(800, 600), "SFML works!");
 	ArcadeGame ag = ArcadeGame();
 	RealLifeGame rlg = RealLifeGame();

@@ -1,3 +1,4 @@
+#include "player.h"
 #include "real_life_game.h"
 
 RealLifeGame::RealLifeGame() {
@@ -16,5 +17,10 @@ RealLifeGame::update() {
 
 void 
 RealLifeGame::render() {
+
+}
+
+void 
+RealLifeGame::set_player(Player *player) {
 
 }
