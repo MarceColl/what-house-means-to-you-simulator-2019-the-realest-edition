@@ -117,6 +117,8 @@ struct ArcadeGame {
 	bool on_platform;
 	bool dj_avail;
 
+	int score;
+
 	float ppb;
 
 	bool reached_platforms;
@@ -145,6 +147,7 @@ struct ArcadeGame {
 		this->curr_platform = 0;
 		this->time = 0;
 		this->dj_avail = true;
+		this->score = 0;
 
 		this->reached_platforms = true;
 
@@ -164,15 +167,11 @@ struct ArcadeGame {
 					.played = false
 				};
 
-				printf("%d \n", offset_beat);
-
 				this->platforms.push_back(plat);
 
 				offset_beat += 1;
 			}
 		}
-
-		printf("%d \n", this->platforms.size());
 	}
 
 	void update_active(sf::Time dt) {
@@ -193,7 +192,14 @@ struct ArcadeGame {
 		this->current_beat += (this->bpm/60)*dt.asSeconds();
 
 		if (this->current_beat >= this->platforms[this->curr_platform].start + this->platforms[this->curr_platform].duration) {
-			this->curr_platform += 1;
+			this->curr_platform += 1; 
+
+			if (this->curr_platform >= this->platforms.size()) {
+				this->curr_platform = 0;
+				this->current_beat = 0.0;
+				this->bpm += 200;
+			}
+
 			this->on_platform = false;
 		}
 
@@ -207,6 +213,8 @@ struct ArcadeGame {
 				this->dj_avail = true;
 				pos->y = this->platforms[this->curr_platform].height;
 				this->platforms[this->curr_platform].played = true;
+				this->score += this->bpm;
+				printf("%d\n", this->score);
 			}
 
 			if (this->on_platform) {
@@ -238,6 +246,10 @@ struct ArcadeGame {
 
 			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
 
+			if (i > size) {
+				x += size * this->ppb;
+			}
+
 			if (x > W_WIDTH + 100) {
 				break;
 			}
@@ -253,6 +265,10 @@ struct ArcadeGame {
 			Platform *p = &this->platforms[(this->curr_platform - i)%size];
 
 			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+
+			if (i > this->curr_platform) {
+				x -= size * this->ppb;
+			}
 
 			if (x < -100) {
 				break;
