@@ -259,6 +259,7 @@ struct RealLifeGame {
 	enum PlayerState {
 		SEATED,
 		STANDING,
+		SEATING,
 		IDLE,
 		WALKING
 	};
@@ -309,13 +310,14 @@ struct RealLifeGame {
 /// ACTION CALLBACKS
 ////////////////////
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
 
 bool RealLifeGame::Actionable::isReachable(float x) {
 	return abs(x - this->position.x) < this->reach;
 }
 
-RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(2), sp(sp) {
+RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(0), sp(sp) {
 	this->player = p;
 	if (!this->scene_texture.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
@@ -354,18 +356,24 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->debug = false;
 
 	this->selected_reachable = 0;
+	/*
 	this->actionables[0].id = 0;
 	this->actionables[0].reach = this->action_reach;
 	this->actionables[0].action = pay_respects;
 	this->actionables[0].action_message = "Press 'F' to pay respects";
 	this->actionables[0].position.x = 300;
 	this->actionables[0].position.y = 400;
-	this->actionables[1].id = 1;
-	this->actionables[1].reach = this->action_reach;
-	this->actionables[1].action = pay_bills;
-	this->actionables[1].action_message = "Press 'F' to pay bills";
-	this->actionables[1].position.x = 325;
-	this->actionables[1].position.y = 400;
+	*/
+	Actionable couch;
+	couch.id = 0;
+	couch.reach = this->action_reach;
+	couch.action = sit;
+	couch.action_message = "Press 'x' to sit on the couch";
+	couch.position.x = w_size.x *0.65;
+	couch.position.y = w_size.x *0.66;
+
+	this->actionables.push_back(couch);
+	
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
 		printf("The font was not found!\n");
@@ -487,11 +495,14 @@ void RealLifeGame::update_active(sf::Time time) {
 		this->selected_reachable = (this->selected_reachable+1) % this->reachable_actionables.size();
 	}
 	//APPLY PLAYER STATE TO ANIMATION (maybe bad idea every tick?)
-	if(this->player_state == SEATED || this->player_state == STANDING) {
+	if(this->player_state == SEATED || this->player_state == STANDING || this->player_state == SEATING) {
 		this->player_sprite.setTexture(this->player_texture_seated);
 		if (this->player_state == STANDING && this->player_animation.current_frame == 0) {
 			this->player_state = IDLE;
 			this->player_sprite.setTexture(this->player_texture_walking);
+		}
+		if(this->player_state == SEATING && this->player_animation.current_frame == 3) {
+			this->player_state = SEATED;
 		}
 	} else {
 		this->player_sprite.setTexture(this->player_texture_walking);
@@ -523,6 +534,13 @@ void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a){
 
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	printf("Respects payed \n");
+}
+void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player_state = RealLifeGame::PlayerState::SEATED;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->action_text.setString("");
 }
 
 struct ArcadeGame {
