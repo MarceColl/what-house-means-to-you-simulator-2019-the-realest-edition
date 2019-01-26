@@ -225,6 +225,8 @@ void RealLifeGame::update_active(sf::Time time) {
 		snprintf(buff, sizeof(buff), "%d / %d", this->selected_reachable, this->reachable_actionables.size());
 		std::string buffAsStdStr = buff;
 		this->reachables_text.setString(buffAsStdStr);
+	} else {
+		this->reachables_text.setString("");
 	}
 
 	/// PROCESS INPUT
@@ -253,6 +255,7 @@ void RealLifeGame::update_active(sf::Time time) {
 
 void RealLifeGame::render(){
 	this->window.draw(this->action_text);
+	this->window.draw(this->reachables_text);
 	this->window.draw(this->player_sprite);
 
 	if (this->debug) {
