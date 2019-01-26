@@ -2,6 +2,7 @@
 
 #include <string>
 #include <queue>
+#include <unordered_map>
 #include <cmath>
 
 #include <SFML/System.hpp>
@@ -48,6 +49,10 @@ struct Event {
 		NotificationData notification;
 	};
 };
+
+struct SoundPlayer {
+	std::unordered_map<std::string, sf::Sound> sound;
+}
 
 struct Player {
 	// 0.0 -> 1.0
