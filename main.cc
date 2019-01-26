@@ -547,6 +547,7 @@ struct ArcadeGame {
 	bool dj_avail;
 
 	bool menu;
+	int menu_selected;
 
 	int score;
 
@@ -555,9 +556,12 @@ struct ArcadeGame {
 	bool reached_platforms;
 
 	sf::Font action_font;
-	sf::Text reachables_text;
 	sf::Text action_text;
 	sf::Text debug_text;
+
+	sf::Text play_text;
+	sf::Text ranking_text;
+	sf::Text exit_text;
 
 	sf::Vector2f speed;
 
@@ -567,12 +571,20 @@ struct ArcadeGame {
 	sf::VertexArray lines;
 
 	std::vector<Platform> platforms;
+	std::vector<sf::Color> colors;
 
 	int curr_platform;
 
 	ArcadeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), lines(sf::Lines, 2), sp(sp) {
 		this->player = p;
 		this->menu = true;
+		this->menu_selected = 0;
+
+		colors.push_back(sf::Color(255, 0, 255));
+		colors.push_back(sf::Color(125, 0, 125));
+		colors.push_back(sf::Color(75, 0, 75));
+		colors.push_back(sf::Color(30, 0, 30));
+		colors.push_back(sf::Color(0, 0, 0));
 
 		if (!this->action_font.loadFromFile("pixelart.ttf")) {
 			printf("The font was not found!\n");
@@ -585,9 +597,24 @@ struct ArcadeGame {
 		this->action_text.setFillColor(sf::Color::White);
 		this->action_text.setPosition(400, window.getSize().y-50);
 
+		this->play_text.setFont(this->action_font);
+		this->play_text.setFillColor(sf::Color::White);
+		this->play_text.setPosition(W_WIDTH/2, W_HEIGHT/5.0);
+		this->play_text.setString("PLAY");
+
+		this->ranking_text.setFont(this->action_font);
+		this->ranking_text.setFillColor(sf::Color::White);
+		this->ranking_text.setPosition(W_WIDTH/2, 2*W_HEIGHT/5.0);
+		this->ranking_text.setString("RANKING");
+
+		this->exit_text.setFont(this->action_font);
+		this->exit_text.setFillColor(sf::Color::White);
+		this->exit_text.setPosition(W_WIDTH/2, 3*W_HEIGHT/5.0);
+		this->exit_text.setString("EXIT");
+
 		this->init();
 
-		sp->add_layer("Bass 1", true);
+		this->sp->play_from_arcade("intro_track_arcade");
 	}
 
 	void init() {
@@ -633,6 +660,22 @@ struct ArcadeGame {
 	}
 
 	void update_active(sf::Time dt) {
+		this->time += dt.asSeconds();
+
+		if (this->menu) {
+			if (once_array[RIGHT]) {
+				this->menu_selected = (this->menu_selected + 1)%3;
+			}
+			if (once_array[LEFT]) {
+				this->menu_selected = (this->menu_selected - 1)%3;
+				if (this->menu_selected < 0) {
+					this->menu_selected = 2;
+				}
+			}
+			
+			return;
+		}
+
 		if (input_array[ACTION]) {
 			if (this->on_platform || this->dj_avail) { 
 				this->speed.y = -800;
@@ -645,8 +688,6 @@ struct ArcadeGame {
 			printf("Exited arcade game\n");
 		}
 		
-		this->time += dt.asSeconds();
-
 		if (this->time > 1.0 && !this->reached_platforms) {
 			this->reached_platforms = true;
 		}
@@ -712,7 +753,6 @@ struct ArcadeGame {
 			pos->y += this->speed.y * dt.asSeconds();
 		}
 
-
 		char buff[100];
 		snprintf(buff, sizeof(buff), "%d", this->score);
 		std::string buffAsStdStr = buff;
@@ -745,6 +785,57 @@ struct ArcadeGame {
 	void update(sf::Time dt) {}
 
 	void render(sf::RenderTarget &target) {
+		if (this->menu) {
+			int color_index;
+
+			sf::RectangleShape rect;
+			color_index = int(sin(this->time*8.0 + 0.5)*5.0);
+
+			rect.setPosition(W_WIDTH/2, W_HEIGHT/2);
+			for (int i = 0; i < 5; ++i) {
+				rect.setFillColor(colors[(i + color_index)%5]);
+				rect.setSize(sf::Vector2f(W_WIDTH - (W_WIDTH/5)*i, W_HEIGHT - (W_HEIGHT/5)*i));
+				rect.setOrigin(sf::Vector2f((W_WIDTH - (W_WIDTH/5)*i)/2, (W_HEIGHT - (W_HEIGHT/5)*i)/2));
+				rect.rotate(color_index*i);
+				target.draw(rect);
+			}
+
+			if (this->menu_selected == 0) {
+				this->play_text.setFillColor(sf::Color(255, 255, 0));
+				sf::FloatRect p_bounds = this->play_text.getGlobalBounds();
+				this->play_text.setOrigin(sf::Vector2f(p_bounds.width/2.0, p_bounds.height/2.0));
+				this->play_text.setPosition(sf::Vector2f(W_WIDTH/2, W_HEIGHT/2 - 5));
+
+				this->ranking_text.setFillColor(sf::Color(255, 255, 255, 128));
+				sf::FloatRect r_bounds = this->ranking_text.getGlobalBounds();
+				this->ranking_text.setOrigin(sf::Vector2f(r_bounds.width/2.0, r_bounds.height/2.0));
+				this->ranking_text.setPosition(sf::Vector2f(3*W_WIDTH/4, W_HEIGHT/2));
+				this->ranking_text.setScale(0.6, 0.6);
+
+				this->exit_text.setFillColor(sf::Color(255, 255, 255, 128));
+				sf::FloatRect e_bounds = this->exit_text.getGlobalBounds();
+				this->exit_text.setOrigin(sf::Vector2f(e_bounds.width/2.0, e_bounds.height/2.0));
+				this->exit_text.setPosition(sf::Vector2f(W_WIDTH/4, W_HEIGHT/2));
+				this->exit_text.setScale(0.6, 0.6);
+			}
+			else if (this->menu_selected == 1) {
+				this->play_text.setFillColor(sf::Color(255, 255, 255));
+				this->ranking_text.setFillColor(sf::Color(255, 255, 0));
+				this->exit_text.setFillColor(sf::Color(255, 255, 255));
+			}
+			else if (this->menu_selected == 2) {
+				this->play_text.setFillColor(sf::Color(255, 255, 255));
+				this->ranking_text.setFillColor(sf::Color(255, 255, 255));
+				this->exit_text.setFillColor(sf::Color(255, 255, 0));
+			}
+
+			target.draw(this->play_text);
+			target.draw(this->ranking_text);
+			target.draw(this->exit_text);
+
+			return;
+		}
+
 		int size = this->platforms.size();
 		for (int i = this->curr_platform; i < size * 2; ++i) {
 			Platform *p = &this->platforms[i%size];
