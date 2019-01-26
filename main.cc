@@ -2,10 +2,14 @@
 
 #include <string>
 #include <queue>
+#include <cmath>
 
 #include <SFML/System.hpp>
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
+
+#define W_WIDTH 800
+#define W_HEIGHT 600
 
 enum Input {
 	LEFT,
@@ -75,7 +79,7 @@ struct Player {
 
 		this->curr_game = ARCADE;
 
-		this->arcade_pos = sf::Vector2f(200.0, 400.0);
+		this->arcade_pos = sf::Vector2f(W_WIDTH/2, 100.0);
 	}
 };
 
@@ -87,19 +91,20 @@ struct RealLifeGame {
 		this->player = p;
 	}
 
-	void update_active() {
+	void update_active(sf::Time dt) {
 	}
 
-	void update() {}
+	void update(sf::Time dt) {}
 
 	void render() {}
 };
 
 struct ArcadeGame {
 	struct Platform {
-		float start;
+		int start;
 		int height;
 		float duration;
+		bool played;
 	};
 
 	Player *player;
@@ -107,65 +112,178 @@ struct ArcadeGame {
 
 	float current_beat;
 	float bpm;
+	double time;
 	bool paused;
+	bool on_platform;
+	bool dj_avail;
+
+	float ppb;
+
+	bool reached_platforms;
+
+	sf::Vector2f speed;
 
 	sf::RectangleShape player_sprite;
 	sf::RectangleShape platform_sprite;
+
+	sf::VertexArray lines;
 
 	std::vector<Platform> platforms;
 
 	int curr_platform;
 
-	ArcadeGame(Player *p, sf::RenderWindow &window): window(window) {
+	ArcadeGame(Player *p, sf::RenderWindow &window): window(window), lines(sf::Lines, 2) {
 		this->player = p;
 		this->current_beat = 0.0;
-		this->bpm = 10.0;
+		this->bpm = 1200.0;
 		this->paused = false;
+		this->on_platform = false;
+		this->ppb = 25;
 		this->player_sprite = sf::RectangleShape(sf::Vector2f(20.0, 20.0));
-		this->platform_sprite = sf::RectangleShape(sf::Vector2f(20.0, 20.0));
+		this->player_sprite.setOrigin(sf::Vector2f(10.0, 20.0));
+		this->platform_sprite = sf::RectangleShape(sf::Vector2f(1.0, 10.0));
 		this->curr_platform = 0;
+		this->time = 0;
+		this->dj_avail = true;
 
+		this->reached_platforms = true;
+
+		this->lines[0] = sf::Vector2f(W_WIDTH/2.0, 0);
+		this->lines[1] = sf::Vector2f(W_WIDTH/2.0, W_HEIGHT);
+
+		int offset_beat = 0;
 		for (int i = 0; i < 50; ++i) {
-			Platform plat = {
-				.start = i * 100.0,
-				.height = std::rand()%100 * 50,
-				.duration = 9.0
-			};
-			platforms.push_back(plat);
+			int beats = std::rand()%4 + 1;
+			int height = 100 + std::rand()%4 * 50;
+
+			for (int j = 0; j < beats; ++j) {
+				Platform plat = {
+					.start = offset_beat,
+					.height = height,
+					.duration = 1,
+					.played = false
+				};
+
+				printf("%d \n", offset_beat);
+
+				this->platforms.push_back(plat);
+
+				offset_beat += 1;
+			}
 		}
+
+		printf("%d \n", this->platforms.size());
 	}
 
-	void update_active() {
+	void update_active(sf::Time dt) {
 		if (input_array[ACTION]) {
-			// JUMP
+			if (this->on_platform || this->dj_avail) { 
+				this->speed.y = -800;
+				this->on_platform = false;
+				this->dj_avail = false;
+			}
 		}
 		else if (input_array[ARCADE_QUIT]) {
 			this->player->curr_game = REAL_LIFE;
 			printf("Exited arcade game\n");
 		}
+		
+		this->time += dt.asSeconds();
+
+		this->current_beat += (this->bpm/60)*dt.asSeconds();
+
+		if (this->current_beat >= this->platforms[this->curr_platform].start + this->platforms[this->curr_platform].duration) {
+			this->curr_platform += 1;
+			this->on_platform = false;
+		}
+
+		if (this->reached_platforms) {
+			sf::Vector2f *pos = &this->player->arcade_pos;
+
+			if (this->speed.y > 0 &&
+				pos->y > this->platforms[this->curr_platform].height &&
+				pos->y < this->platforms[this->curr_platform].height + 20) {
+				this->on_platform = true;
+				this->dj_avail = true;
+				pos->y = this->platforms[this->curr_platform].height;
+				this->platforms[this->curr_platform].played = true;
+			}
+
+			if (this->on_platform) {
+				this->speed.y = 0;
+				this->player_sprite.setRotation(0);
+				this->player_sprite.setOrigin(sf::Vector2f(10.0, 20.0));
+			}
+			else {
+				this->speed.y += 2000.0 * dt.asSeconds();
+				this->player_sprite.rotate(180*dt.asSeconds());
+				this->player_sprite.setOrigin(sf::Vector2f(10.0, 10.0));
+			}
+
+			pos->y += this->speed.y * dt.asSeconds();
+		}
+
+		// Let it wiggle
+		this->player_sprite.setScale(
+				1.0 + sin(this->time*10)*0.2, 
+				1.0 + cos(this->time*10)*0.2);
 	}
 
-	void update() {}
+	void update(sf::Time dt) {}
 
 	void render() {
-		for (int i = 0; i < this->platforms.size(); ++i) {
-			Platform *p = &this->platforms[i];
-			this->platform_sprite.setPosition(sf::Vector2f(this->platforms[i].start, p->height));
+		int size = this->platforms.size();
+		for (int i = this->curr_platform; i < size * 2; ++i) {
+			Platform *p = &this->platforms[i%size];
+
+			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+
+			if (x > W_WIDTH + 100) {
+				break;
+			}
+
+			this->platform_sprite.setPosition(sf::Vector2f(x, p->height));
 			this->platform_sprite.setFillColor(sf::Color(255, 0, 255));
-			this->platform_sprite.setScale(p->duration, 1);
+			this->platform_sprite.setScale(p->duration * this->ppb, 1);
+
+			window.draw(this->platform_sprite);
+		}
+
+		for (int i = 0; i < size * 2; ++i) {
+			Platform *p = &this->platforms[(this->curr_platform - i)%size];
+
+			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+
+			if (x < -100) {
+				break;
+			}
+
+			this->platform_sprite.setPosition(sf::Vector2f(x, p->height));
+			if (p->played) {
+				this->platform_sprite.setFillColor(sf::Color(255, 255, 0));
+			}
+			else {
+				this->platform_sprite.setFillColor(sf::Color(255, 0, 255));
+			}
+			this->platform_sprite.setScale(p->duration * this->ppb, 1);
+
 			window.draw(this->platform_sprite);
 		}
 
 		this->player_sprite.setPosition(player->arcade_pos);
 		window.draw(this->player_sprite);
+
+		// window.draw(this->lines);
 	}
 };
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode(800, 600), "SFML works!");
+    sf::RenderWindow window(sf::VideoMode(W_WIDTH, W_HEIGHT), "SFML works!");
 	Player player = Player();
 	ArcadeGame ag = ArcadeGame(&player, window);
 	RealLifeGame rlg = RealLifeGame(&player, window);
+
+	sf::Clock deltaClock;
 
     while (window.isOpen())
     {
@@ -207,14 +325,16 @@ int main() {
 
         window.clear();
 
+		sf::Time dt = deltaClock.restart();
+
 		if (player.curr_game == REAL_LIFE) {
-			ag.update();
-			rlg.update_active();
+			ag.update(dt);
+			rlg.update_active(dt);
 			rlg.render();
 		}
 		else {
-			rlg.update();
-			ag.update_active();
+			rlg.update(dt);
+			ag.update_active(dt);
 			ag.render();
 		}
 
