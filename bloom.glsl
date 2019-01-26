@@ -1,6 +1,15 @@
 uniform sampler2D 	source;
 // uniform vec2 		offsetFactor;
 
+float random( vec2 p )
+{
+    vec2 K1 = vec2(
+        23.14069263277926, // e^pi (Gelfond's constant)
+         2.665144142690225 // 2^sqrt(2) (Gelfondâ€“Schneider constant)
+    );
+    return fract( cos( dot(p,K1) ) * 12345.6789 );
+}
+
 void main()
 {
 	vec2 offsetFactor = vec2(0.05, 0.05);

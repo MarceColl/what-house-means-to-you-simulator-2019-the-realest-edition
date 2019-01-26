@@ -141,6 +141,10 @@ struct ArcadeGame {
 
 	ArcadeGame(Player *p, sf::RenderWindow &window): window(window), lines(sf::Lines, 2) {
 		this->player = p;
+		this->init();
+	}
+
+	void init() {
 		this->bpm = 1200.0;
 		this->current_beat = -1.3 * (this->bpm/60);
 		this->paused = false;
@@ -155,10 +159,11 @@ struct ArcadeGame {
 		this->score = 0;
 
 		this->reached_platforms = false;
+		this->speed.y = 0.0;
 
-		this->lines[0] = sf::Vector2f(W_WIDTH/2.0, 0);
-		this->lines[1] = sf::Vector2f(W_WIDTH/2.0, W_HEIGHT);
+		this->player->arcade_pos.y = 100.0;
 
+		this->platforms = std::vector<Platform>();
 		int offset_beat = 0;
 		for (int i = 0; i < 50; ++i) {
 			int beats = std::rand()%4 + 1;
@@ -245,6 +250,10 @@ struct ArcadeGame {
 		this->player_sprite.setScale(
 				1.0 + sin(this->time*10)*0.2, 
 				1.0 + cos(this->time*10)*0.2);
+
+		if (this->player->arcade_pos.y > W_HEIGHT) {
+			this->init();
+		}
 	}
 
 	void update(sf::Time dt) {}
