@@ -93,11 +93,78 @@ struct SoundPlayer {
 	std::unordered_map<std::string, sf::Sound> sound;
 	std::unordered_map<std::string, sf::SoundBuffer> buffers;
 
+	int beat;
+	double time;
+	int bpm;
+
 	float immersion;
 
+	std::queue<sf::Sound*> play_queue;
+	std::queue<sf::Sound*> stop_queue;
+
  	SoundPlayer() {
+		this->beat = 0;
+		this->time = 0.0;
+		this->bpm = 130;
+
 		this->add_track("intro_track_arcade", "./Tracks/Intro Arcade.ogg");
+		this->add_track("FX_Gameover", "./FX/FX_Gameover.ogg");
+		this->add_track("Bass 1", "./Stages/1/Bass 1.ogg");
+		this->sound["Bass 1"].setLoop(true);
+		this->add_track("Kick", "./Stages/1/Kick.ogg");
+		this->sound["Kick"].setLoop(true);
+		this->add_track("Snare", "./Stages/1/Snare.ogg");
+		this->sound["Snare"].setLoop(true);
+		this->add_track("Lead 1", "./Stages/1/Lead 1.ogg");
+		this->sound["Lead 1"].setLoop(true);
+		this->add_track("Lead 2", "./Stages/1/Lead 2.ogg");
+		this->sound["Lead 2"].setLoop(true);
+		this->add_track("Lead 3", "./Stages/1/Lead 3.ogg");
+		this->sound["Lead 3"].setLoop(true);
+
 		this->immersion = 0.0f;
+	}
+
+	void update(sf::Time time) {
+		this->time += time.asSeconds();
+
+		int cbeat = this->time*this->bpm/60.0;
+
+		if (cbeat > this->beat) {
+			this->beat = cbeat;	
+
+			if (cbeat % 8 == 0) {
+				while(!this->play_queue.empty()) {
+					this->play_queue.front()->play();
+					this->play_queue.pop();
+				}
+
+				while(!this->stop_queue.empty()) {
+					this->stop_queue.front()->stop();
+					this->stop_queue.pop();
+				}
+			}
+		}
+	}
+
+	void add_layer(std::string name, bool loop) {
+		sf::Sound *s = &this->sound[name];
+
+		s->setLoop(loop);
+		if (s->getStatus() != sf::SoundSource::Status::Playing) {
+			s->stop();
+			this->play_queue.push(s);
+		}
+	}
+
+	void stop_layer(std::string name, bool loop) {
+		sf::Sound *s = &this->sound[name];
+
+		s->setLoop(loop);
+		if (s->getStatus() != sf::SoundSource::Status::Playing) {
+			s->stop();
+			this->stop_queue.push(s);
+		}
 	}
 
 	void add_track(std::string name, std::string file_path) {
@@ -136,6 +203,8 @@ struct RealLifeGame {
 
 	bool debug;
 	Player *player;
+	SoundPlayer *sp;
+
 	std::vector<Actionable> actionables;
 	std::vector<Actionable> reachable_actionables;
 	int selected_reachable;
@@ -156,7 +225,7 @@ struct RealLifeGame {
 	float mov_speed;
 	float action_reach;
 
-	RealLifeGame(Player *p, sf::RenderWindow &window);
+	RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp);
 
 	void removeActionable(int id);
 
@@ -179,7 +248,7 @@ bool RealLifeGame::Actionable::isReachable(float x) {
 	return abs(x - this->position.x) < this->reach;
 }
 
-RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window): window(window), actionables(2) {
+RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(2), sp(sp) {
 	this->player = p;
 	if (!this->scene_texture.loadFromFile("Images/escenario.png")) {
 		printf("The scene was not found!\n");
@@ -334,7 +403,10 @@ struct ArcadeGame {
 	};
 
 	Player *player;
+	SoundPlayer *sp;
 	sf::RenderWindow &window;
+
+	float current_good;
 
 	float current_beat;
 	float bpm;
@@ -367,7 +439,7 @@ struct ArcadeGame {
 
 	int curr_platform;
 
-	ArcadeGame(Player *p, sf::RenderWindow &window): window(window), lines(sf::Lines, 2) {
+	ArcadeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), lines(sf::Lines, 2), sp(sp) {
 		this->player = p;
 		this->menu = true;
 
@@ -383,9 +455,13 @@ struct ArcadeGame {
 		this->action_text.setPosition(400, window.getSize().y-50);
 
 		this->init();
+
+		sp->add_layer("Bass 1", true);
 	}
 
 	void init() {
+		this->current_good = 500.0;
+
 		this->bpm = 1200.0;
 		this->current_beat = -1.3 * (this->bpm/60);
 		this->paused = false;
@@ -444,6 +520,23 @@ struct ArcadeGame {
 			this->reached_platforms = true;
 		}
 
+		if (this->current_good > 100 && this->current_good < 150) {
+			sp->add_layer("Kick", true);
+		}
+		if (this->current_good > 150) {
+			sp->add_layer("Snare", true);
+		}
+		if (this->current_good > 650 && this->current_good < 750) {
+			sp->add_layer("Lead 1", true);
+			sp->stop_layer("Lead 2", true);
+			sp->stop_layer("Lead 3", true);
+		}
+		if (this->current_good >= 750 && this->current_good < 850) {
+			sp->add_layer("Lead 2", true);
+			sp->stop_layer("Lead 1", true);
+			sp->stop_layer("Lead 3", true);
+		}
+
 		this->current_beat += (this->bpm/60)*dt.asSeconds();
 
 		if (this->reached_platforms) {
@@ -454,6 +547,7 @@ struct ArcadeGame {
 					this->curr_platform = 0;
 					this->current_beat = 0.0;
 					this->bpm += 200;
+					this->current_good += 100;
 				}
 
 				this->on_platform = false;
@@ -469,6 +563,7 @@ struct ArcadeGame {
 				pos->y = this->platforms[this->curr_platform].height;
 				this->platforms[this->curr_platform].played = true;
 				this->score += this->bpm;
+				this->current_good += 5;
 				printf("%d\n", this->score);
 			}
 
@@ -485,6 +580,7 @@ struct ArcadeGame {
 
 			pos->y += this->speed.y * dt.asSeconds();
 		}
+
 
 		char buff[100];
 		snprintf(buff, sizeof(buff), "%d", this->score);
@@ -504,6 +600,12 @@ struct ArcadeGame {
 			if (this->score > this->player->high_score) {
 				this->player->high_score = this->score;
 			}
+			sp->play_from_arcade("FX_Gameover");
+			this->current_good -= 400;
+
+			sp->stop_layer("Lead 1", true);
+			sp->stop_layer("Lead 2", true);
+			sp->stop_layer("Lead 3", true);
 
 			this->init();
 		}
@@ -570,11 +672,12 @@ struct ArcadeGame {
 
 int main() {
     sf::RenderWindow window(sf::VideoMode(W_WIDTH, W_HEIGHT), "SFML works!");
-	Player player = Player();
-	ArcadeGame ag = ArcadeGame(&player, window);
-	RealLifeGame rlg = RealLifeGame(&player, window);
-
 	SoundPlayer sp = SoundPlayer();
+
+	Player player = Player();
+	ArcadeGame ag = ArcadeGame(&player, window, &sp);
+	RealLifeGame rlg = RealLifeGame(&player, window, &sp);
+
 
 	sf::RenderTexture texture;
 	texture.create(W_WIDTH, W_HEIGHT);
@@ -588,8 +691,6 @@ int main() {
 
 	sf::Shader bloom;
 	bloom.loadFromFile("bloom.glsl", sf::Shader::Fragment);
-
-	sp.play_from_arcade("intro_track_arcade");
 
     while (window.isOpen())
     {
@@ -644,6 +745,8 @@ int main() {
         window.clear();
 
 		sf::Time dt = deltaClock.restart();
+
+		sp.update(dt);
 
 		if (player.curr_game == REAL_LIFE) {
 			ag.update(dt);
