@@ -134,6 +134,7 @@ struct SoundPlayer {
 		this->add_track("real_life_track", "./Tracks/Real Life Soundscape.ogg");
 		this->sound["real_life_track"].setLoop(true);
 		this->add_track("crunch", "./FX/FX_Crunch.ogg");
+		this->add_track("pee_need", "./FX/FX_Pee Need.ogg");
 		this->add_track("eat", "./FX/FX_Eat.ogg");
 		this->add_track("fart", "./FX/FX_Fart.ogg");
 		this->add_track("pee", "./FX/FX_Pee.ogg");
@@ -286,8 +287,10 @@ struct SoundPlayer {
 	}
 
 	void play_from_real_life(std::string name) {
-		this->sound[name].setVolume(100.0 - this->immersion);
-		this->sound[name].play();
+		// this->sound[name].setVolume(100.0 - this->immersion);
+		if (this->sound[name].getStatus() != sf::SoundSource::Status::Playing) {
+			this->sound[name].play();
+		}
 	}
 };
 
@@ -644,6 +647,12 @@ void RealLifeGame::update_debug(){
 
 void RealLifeGame::update(sf::Time time) {
 	this->player->hunger_need += 0.01 * time.asSeconds();
+	this->player->pee_need += 0.05 * time.asSeconds();
+
+	if (this->player->pee_need > 0.8) {
+		this->sp->play_from_real_life("pee_need");
+	}
+
 	this->day = !this->day;
 }
 
