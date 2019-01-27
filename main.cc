@@ -118,6 +118,9 @@ struct SoundPlayer {
 		this->bpm = 130;
 
 		this->add_track("intro_track_arcade", "./Tracks/Intro Arcade.ogg");
+		this->add_track("real_life_track", "./Tracks/Real Life Soundscape.ogg");
+		this->sound["real_life_track"].setLoop(true);
+		this->add_track("crunch", "./FX/FX_Crunch.ogg");
 		this->add_track("FX_Gameover", "./FX/FX_Gameover.ogg");
 		this->add_track("Bass 1", "./Stages/1/Bass 1.ogg");
 		this->sound["Bass 1"].setLoop(true);
@@ -271,15 +274,39 @@ struct SoundPlayer {
 };
 
 struct RealLifeGame {
+
+	enum Room {
+		BATHROOM,
+		DEN
+	};
 	struct Actionable {
 		int id;
 		std::string action_message;
 		sf::Vector2f position;
 		void (*action)(RealLifeGame*, Actionable);
 		int reach;
+
+		bool auto_action;
+		float elapsed;
+		float action_length;
+
 		bool visible;
 		sf::Texture texture;
 		sf::Sprite sprite;
+
+		Room room;
+		
+		Actionable() {
+			this->id = -1;
+			this->action_message = "";
+			this->position = sf::Vector2f(0.0,0.0);
+			this->reach = 20;
+			this->auto_action = false;
+			this->elapsed = 0;
+			this->action_length = 1000;
+			this->visible = false;
+
+		}
 
 		bool isReachable(float x);
 	};
@@ -348,6 +375,8 @@ struct RealLifeGame {
 		WALKING
 	};
 
+	Room current_room;
+
 	bool debug;
 	Player *player;
 	SoundPlayer *sp;
@@ -357,6 +386,7 @@ struct RealLifeGame {
 	int selected_reachable;
 	
 	sf::Texture scene_texture;
+	sf::Texture bathroom_texture;
 	sf::Sprite scene_sprite;
 
 	sf::Texture vr_texture;
@@ -402,6 +432,7 @@ struct RealLifeGame {
 ////////////////////
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
 
 bool RealLifeGame::Actionable::isReachable(float x) {
@@ -413,6 +444,10 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	if (!this->scene_texture.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
 	}
+	if (!this->bathroom_texture.loadFromFile("Images/bathroom.png")) {
+		printf("The bathroom not found!\n");
+	}
+	this->current_room = DEN;
 	sf::Vector2u w_size = window.getSize();
 	sf::Vector2u st_size = this->scene_texture.getSize();
 	this->scene_sprite.setTexture(this->scene_texture);
@@ -451,7 +486,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->vr_bottom_pos = 0;
 	this->vr_top_pos = -100;
 
-	this->mov_speed = 0.1;
+	this->mov_speed = 30;
 	this->action_reach = 50;
 	this->debug = false;
 
@@ -466,13 +501,29 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	*/
 	Actionable couch;
 	couch.id = 0;
+	couch.room = DEN;
 	couch.reach = this->action_reach;
 	couch.action = sit;
 	couch.action_message = "Press 'x' to sit on the couch";
 	couch.position.x = w_size.x *0.65;
 	couch.position.y = w_size.x *0.66;
-
+	couch.auto_action = false;
+	couch.visible = false;
 	this->actionables.push_back(couch);
+
+	Actionable doritos;
+	doritos.id = 1;
+	doritos.reach = 40;
+	couch.room = DEN;
+	doritos.action = crunch;
+	doritos.action_message = "";
+	doritos.position.x = w_size.x *0.54;
+	doritos.position.y = w_size.x *0.66;
+	doritos.auto_action = true;
+	doritos.action_length = 500;
+	doritos.elapsed = 0;
+	doritos.visible = false;
+	this->actionables.push_back(doritos);
 
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
@@ -509,6 +560,7 @@ void RealLifeGame::update(sf::Time time) {
 }
 
 void RealLifeGame::update_active(sf::Time time) {
+	sf::Vector2u w_size = window.getSize();
 	/// ACTIONABLES
 	this->reachable_actionables.clear();
 	// IF DUDE IS NOT SITTING, LET HIM DO SHITE
@@ -518,9 +570,18 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->vr_pos_y -= time.asMilliseconds();
 		}
 
-		for (auto actionable : this->actionables) {
-			if(actionable.isReachable(this->player->real_life_pos.x)) {
-				this->reachable_actionables.push_back(actionable);
+		for(int i = 0; i < this->actionables.size(); i++)
+		{
+			if(this->actionables[i].isReachable(this->player->real_life_pos.x)) {
+				if (this->actionables[i].auto_action) {
+					this->actionables[i].elapsed += time.asMilliseconds();
+					if (this->actionables[i].elapsed > this->actionables[i].action_length) {
+						this->actionables[i].elapsed = this->actionables[i].elapsed - this->actionables[i].action_length;
+						this->actionables[i].action(this, this->actionables[i]);
+					}
+				} else {
+					this->reachable_actionables.push_back(this->actionables[i]);
+				}
 			}
 		}
 
@@ -573,7 +634,19 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_animation.loop = true;
 		}
 		if (this->player_state == WALKING) {
-			this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed;
+			if (this->current_room == DEN) {
+				if(this->player->real_life_pos.x > 0) {
+					this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
+				} else {
+					this->current_room = BATHROOM;
+					this->scene_sprite.setTexture(this->bathroom_texture);
+					this->player->real_life_pos.x = w_size.x*0.85;
+				}
+			} else {
+				if(this->player->real_life_pos.x > w_size.x*0.6) {
+					this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
+				}
+			}
 		}
 	}
 	else if (input_array[RIGHT]) {
@@ -584,7 +657,20 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_animation.loop = true;
 		}
 		if (this->player_state == WALKING) {
-			this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed;
+			if (this->current_room == DEN) {
+				if(this->player->real_life_pos.x < w_size.x * 0.95) {
+					this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
+				}
+			} else {
+				if(this->player->real_life_pos.x > w_size.x*0.99) {
+					this->current_room = DEN;
+					this->scene_sprite.setTexture(this->scene_texture);
+					this->player->real_life_pos.x = w_size.x*0.1;
+				} else {
+					this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
+				}
+			}
+			
 		}
 	} else {
 		if(this->player_state == WALKING) { 
@@ -603,6 +689,7 @@ void RealLifeGame::update_active(sf::Time time) {
 		} else if (this->player_state == SEATED) {
 			this->player_state = STANDING;
 			this->player_animation.inverted = true;
+			this->sp->fade_in("real_life_track", 1.0);
 		}
 	}
 	else if (once_array[TOGGLE]) {
@@ -630,7 +717,7 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->player_sprite.setPosition(this->player->real_life_pos);
 
 	float x = 0;
-	sf::Vector2u w_size = window.getSize();
+	
 	if (this->player_state == SEATED) {
 		x = this->player->real_life_pos.x - w_size.x*0.66;
 	} else {
@@ -670,6 +757,10 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player_animation.loop = false;
 	rlg->player_animation.current_frame = 0;
 	rlg->action_text.setString("");
+}
+
+void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->sp->play_from_arcade("crunch");
 }
 
 struct ArcadeGame {
