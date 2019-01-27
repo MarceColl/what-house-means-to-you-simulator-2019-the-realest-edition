@@ -283,6 +283,11 @@ struct SoundPlayer {
 		this->sound[name].play();
 	}
 
+	void play_from_arcade_with_offset(std::string name, sf::Time t) {
+		this->sound[name].setPlayingOffset(t);
+		this->sound[name].play();
+	}
+
 	void play_from_real_life(std::string name) {
 		this->sound[name].setVolume(100.0 - this->immersion);
 		this->sound[name].play();
@@ -786,6 +791,7 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_state = STANDING;
 			this->player_animation.inverted = true;
 			this->sp->fade_in("real_life_track", 1.0);
+			this->sp->play_from_arcade_with_offset("vr", sf::seconds(1.8));
 		}
 	}
 	else if (once_array[TOGGLE]) {
@@ -870,6 +876,7 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player_animation.loop = false;
 	rlg->player_animation.current_frame = 0;
 	rlg->action_text.setString("");
+	rlg->sp->play_from_arcade_with_offset("vr", sf::seconds(0.8));
 }
 
 void pee(RealLifeGame *rlg, RealLifeGame::Actionable a) {
