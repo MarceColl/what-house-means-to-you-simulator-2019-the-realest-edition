@@ -84,9 +84,12 @@ struct Player {
 
 	Game curr_game;
 
+	bool dead;
+
 	std::queue<Event*> event_queue;
 
 	Player() {
+		this->dead = false;
 		this->pee_need = 0.0;
 		this->hunger_need = 0.0;
 		this->hygiene_need = 0.0;
@@ -415,6 +418,7 @@ struct RealLifeGame {
 	float vr_pos_y;
 
 
+	sf::Texture player_texture_dead;
 	sf::Texture player_texture_acting;
 	sf::Texture player_texture_acting_night;
 	sf::Texture player_texture_acting_day;
@@ -487,6 +491,9 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->scene_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player->real_life_pos.x = w_size.x *0.65;
 	this->player->real_life_pos.y = w_size.y *0.66;
+	if (!this->player_texture_dead.loadFromFile("Images/dead.png")) {
+		printf("dead not found!\n");
+	}
 	if (!this->player_texture_acting_day.loadFromFile("Images/sprites_finals/giro_dia.png")) {
 		printf("act not found!\n");
 	}
@@ -550,7 +557,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.action = sit;
 	couch.action_message = "Press 'x' to sit on the couch";
 	couch.position.x = w_size.x *0.65;
-	couch.position.y = w_size.x *0.66;
+	couch.position.y = w_size.y *0.66;
 	couch.auto_action = false;
 	couch.visible = false;
 	this->actionables.push_back(couch);
@@ -562,7 +569,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.action = feed;
 	couch.action_message = "Press 'x' to feed yourself";
 	couch.position.x = w_size.x *0.25;
-	couch.position.y = w_size.x *0.66;
+	couch.position.y = w_size.y *0.66;
 	couch.auto_action = false;
 	couch.visible = false;
 	this->actionables.push_back(couch);
@@ -574,7 +581,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	doritos.action = crunch;
 	doritos.action_message = "";
 	doritos.position.x = w_size.x *0.54;
-	doritos.position.y = w_size.x *0.66;
+	doritos.position.y = w_size.y *0.66;
 	doritos.auto_action = true;
 	doritos.action_length = 500;
 	doritos.elapsed = 0;
@@ -583,16 +590,28 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 
 
 	Actionable lavabo;
-	lavabo.id = 1;
-	lavabo.reach = 20;
+	lavabo.id = 2;
+	lavabo.reach = 30;
 	lavabo.room = BATHROOM;
 	lavabo.action = pee;
-	couch.action_message = "Press 'x' to pee";
-	couch.position.x = w_size.x *0.85;
-	couch.position.y = w_size.x *0.66;
+	lavabo.action_message = "Press 'x' to pee";
+	lavabo.position.x = w_size.x *0.90;
+	lavabo.position.y = w_size.y *0.66;
 	lavabo.auto_action = false;
 	lavabo.visible = false;
 	this->actionables.push_back(lavabo);
+
+	Actionable bottle;
+	bottle.id = 3;
+	bottle.reach = 20;
+	bottle.room = DEN;
+	bottle.action = pee;
+	bottle.action_message = "Press 'x' to pee in the bottle";
+	bottle.position.x = w_size.x *0.75;
+	bottle.position.y = w_size.y *0.66;
+	bottle.auto_action = false;
+	bottle.visible = false;
+	this->actionables.push_back(bottle);
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
 		printf("The font was not found!\n");
@@ -649,7 +668,6 @@ void RealLifeGame::update_active(sf::Time time) {
 		if (this->vr_pos_y > this->vr_top_pos) {
 			this->vr_pos_y -= time.asMilliseconds();
 		}
-
 		for(int i = 0; i < this->actionables.size(); i++)
 		{
 			if(this->actionables[i].isReachable(this->current_room, this->player->real_life_pos.x)) {
@@ -781,7 +799,11 @@ void RealLifeGame::update_active(sf::Time time) {
 		}
 	}
 	//APPLY PLAYER STATE TO ANIMATION (maybe bad idea every tick?)
-	if(this->player_state == STARTING_ACTION || this->player_state == ENDING_ACTION){
+	if (this->player->dead) {
+		this->player_sprite.setTexture(this->player_texture_dead);
+		this->player_animation.current_frame = 0;
+	}
+	else if(this->player_state == STARTING_ACTION || this->player_state == ENDING_ACTION){
 		this->player_sprite.setTexture(this->player_texture_acting);
 		if(this->player_state == STARTING_ACTION && this->player_animation.current_frame == 3) {
 			this->player_state = ENDING_ACTION;
@@ -809,7 +831,7 @@ void RealLifeGame::update_active(sf::Time time) {
 
 	float x = 0;
 	
-	if (this->player_state == SEATED) {
+	if (this->player_state == SEATED && !this->player->dead) {
 		x = this->player->real_life_pos.x - w_size.x*0.66;
 	} else {
 		x = this->vr_sprite.getPosition().x;
