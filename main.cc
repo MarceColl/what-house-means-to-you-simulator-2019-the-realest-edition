@@ -208,10 +208,29 @@ struct SoundPlayer {
 		this->fade_inout_queue.push_back(d);
 	}
 
+	void fade_out_layers(float time) {
+		this->fade_out("Kick", time);
+		this->fade_out("Snare", time);
+		this->fade_out("Bass 1", time);
+		this->fade_out("Lead 1", time);
+		this->fade_out("Lead 2", time);
+		this->fade_out("Lead 3", time);
+	}
+
+	void fade_in_layers(float time) {
+		this->fade_in("Kick", time);
+		this->fade_in("Snare", time);
+		this->fade_in("Bass 1", time);
+		this->fade_in("Lead 1", time);
+		this->fade_in("Lead 2", time);
+		this->fade_in("Lead 3", time);
+	}
+
 	void add_layer(std::string name, bool loop) {
 		sf::Sound *s = &this->sound[name];
 
 		s->setLoop(loop);
+		s->setVolume(100);
 		if (s->getStatus() != sf::SoundSource::Status::Playing) {
 			s->stop();
 			this->play_queue.push(s);
@@ -801,8 +820,17 @@ struct ArcadeGame {
 				}
 			}
 			if (input_array[ACTION]) {
-				this->menu = false;
-				this->init();
+				if (this->menu_selected == 0) {
+					this->menu = false;
+					this->init();
+				}
+				else if (this->menu_selected == 1) {
+					// TODO(Marce): Implement ranking
+				}
+				else if (this->menu_selected == 2) {
+					this->player->curr_game = REAL_LIFE;
+					this->sp->fade_out("intro_track_arcade", 1.0);
+				}
 			}
 			
 			return;
@@ -817,6 +845,7 @@ struct ArcadeGame {
 		}
 		else if (input_array[ARCADE_QUIT]) {
 			this->player->curr_game = REAL_LIFE;
+			this->sp->fade_out_layers(1.0);
 			printf("Exited arcade game\n");
 		}
 		else if (input_array[DROP]) {
@@ -1034,6 +1063,10 @@ int main() {
 	ArcadeGame ag = ArcadeGame(&player, window, &sp);
 	RealLifeGame rlg = RealLifeGame(&player, window, &sp);
 
+	sf::Font action_font;
+	if (!action_font.loadFromFile("pixelart.ttf")) {
+		printf("The font was not found!\n");
+	}
 
 	sf::RenderTexture texture;
 	texture.create(W_WIDTH, W_HEIGHT);
@@ -1042,6 +1075,19 @@ int main() {
 	sc_sprite.setOrigin(sf::Vector2f(W_WIDTH/2, W_HEIGHT/2));
 	sc_sprite.setScale(sf::Vector2f(1.0, -1.0));
 	sc_sprite.setPosition(sf::Vector2f(W_WIDTH/2, W_HEIGHT/2));
+
+	sf::RectangleShape notif_sq;
+	sf::Text notif_text("Holiii", action_font);
+	notif_text.setFont(action_font);
+	notif_text.setCharacterSize(14);
+	notif_text.setFillColor(sf::Color(0, 0, 0));
+	notif_sq.setFillColor(sf::Color(0, 240, 30));
+	notif_sq.setOutlineColor(sf::Color(0, 120, 15));
+	notif_sq.setOutlineThickness(5.0);
+	notif_sq.setSize(sf::Vector2f(200, 100));
+
+	notif_sq.setPosition(sf::Vector2f(W_WIDTH - 200 - 10, W_HEIGHT - 100 - 10));
+	notif_text.setPosition(sf::Vector2f(W_WIDTH - 200, W_HEIGHT - 100));
 
 	sf::Clock deltaClock;
 
@@ -1125,11 +1171,12 @@ int main() {
 			window.draw(sc_sprite, &bloom);
 		}
 
+		window.draw(notif_sq);
+		window.draw(notif_text);
+
 		for (int i = 0; i < INPUT_COUNT; i++) {
 			once_array[i] = false;
 		}
-
-		printf("%f\n", player.hunger_need);
 
         window.display();
     }
