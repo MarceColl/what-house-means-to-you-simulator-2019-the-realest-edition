@@ -255,6 +255,11 @@ struct SoundPlayer {
 };
 
 struct RealLifeGame {
+
+	enum Room {
+		BATHROOM,
+		DEN
+	};
 	struct Actionable {
 		int id;
 		std::string action_message;
@@ -269,6 +274,8 @@ struct RealLifeGame {
 		bool visible;
 		sf::Texture texture;
 		sf::Sprite sprite;
+
+		Room room;
 		
 		Actionable() {
 			this->id = -1;
@@ -349,6 +356,8 @@ struct RealLifeGame {
 		WALKING
 	};
 
+	Room current_room;
+
 	bool debug;
 	Player *player;
 	SoundPlayer *sp;
@@ -358,6 +367,7 @@ struct RealLifeGame {
 	int selected_reachable;
 	
 	sf::Texture scene_texture;
+	sf::Texture bathroom_texture;
 	sf::Sprite scene_sprite;
 
 	sf::Texture vr_texture;
@@ -415,6 +425,10 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	if (!this->scene_texture.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
 	}
+	if (!this->bathroom_texture.loadFromFile("Images/bathroom.png")) {
+		printf("The bathroom not found!\n");
+	}
+	this->current_room = DEN;
 	sf::Vector2u w_size = window.getSize();
 	sf::Vector2u st_size = this->scene_texture.getSize();
 	this->scene_sprite.setTexture(this->scene_texture);
@@ -468,6 +482,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	*/
 	Actionable couch;
 	couch.id = 0;
+	couch.room = DEN;
 	couch.reach = this->action_reach;
 	couch.action = sit;
 	couch.action_message = "Press 'x' to sit on the couch";
@@ -480,6 +495,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	Actionable doritos;
 	doritos.id = 1;
 	doritos.reach = 40;
+	couch.room = DEN;
 	doritos.action = crunch;
 	doritos.action_message = "";
 	doritos.position.x = w_size.x *0.54;
@@ -525,6 +541,7 @@ void RealLifeGame::update(sf::Time time) {
 }
 
 void RealLifeGame::update_active(sf::Time time) {
+	sf::Vector2u w_size = window.getSize();
 	/// ACTIONABLES
 	this->reachable_actionables.clear();
 	// IF DUDE IS NOT SITTING, LET HIM DO SHITE
@@ -533,7 +550,7 @@ void RealLifeGame::update_active(sf::Time time) {
 		if (this->vr_pos_y > this->vr_top_pos) {
 			this->vr_pos_y -= time.asMilliseconds();
 		}
-		
+
 		for(int i = 0; i < this->actionables.size(); i++)
 		{
 			if(this->actionables[i].isReachable(this->player->real_life_pos.x)) {
@@ -598,7 +615,19 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_animation.loop = true;
 		}
 		if (this->player_state == WALKING) {
-			this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
+			if (this->current_room == DEN) {
+				if(this->player->real_life_pos.x > 0) {
+					this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
+				} else {
+					this->current_room = BATHROOM;
+					this->scene_sprite.setTexture(this->bathroom_texture);
+					this->player->real_life_pos.x = w_size.x*0.85;
+				}
+			} else {
+				if(this->player->real_life_pos.x > w_size.x*0.6) {
+					this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
+				}
+			}
 		}
 	}
 	else if (input_array[RIGHT]) {
@@ -609,7 +638,20 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_animation.loop = true;
 		}
 		if (this->player_state == WALKING) {
-			this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
+			if (this->current_room == DEN) {
+				if(this->player->real_life_pos.x < w_size.x * 0.95) {
+					this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
+				}
+			} else {
+				if(this->player->real_life_pos.x > w_size.x*0.99) {
+					this->current_room = DEN;
+					this->scene_sprite.setTexture(this->scene_texture);
+					this->player->real_life_pos.x = w_size.x*0.1;
+				} else {
+					this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
+				}
+			}
+			
 		}
 	} else {
 		if(this->player_state == WALKING) { 
@@ -656,7 +698,7 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->player_sprite.setPosition(this->player->real_life_pos);
 
 	float x = 0;
-	sf::Vector2u w_size = window.getSize();
+	
 	if (this->player_state == SEATED) {
 		x = this->player->real_life_pos.x - w_size.x*0.66;
 	} else {
