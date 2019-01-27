@@ -14,6 +14,14 @@
 #define W_WIDTH 800
 #define W_HEIGHT 600
 
+std::string names[] = {
+	"aslogd",
+	"dbnpm",
+	"Pinkii",
+	"kaitokidi",
+	"mcoll",
+};
+
 enum Input {
 	LEFT,
 	RIGHT,
@@ -777,6 +785,8 @@ struct ArcadeGame {
 
 	float current_good;
 
+	std::vector<std::string> names;
+
 	float current_beat;
 	float bpm;
 	double time;
@@ -785,6 +795,7 @@ struct ArcadeGame {
 	bool dj_avail;
 
 	bool menu;
+	bool ranking;
 	int menu_selected;
 
 	int score;
@@ -811,12 +822,29 @@ struct ArcadeGame {
 	std::vector<Platform> platforms;
 	std::vector<sf::Color> colors;
 
+	struct RankingEntry {
+		int score;
+		std::string name;
+	};
+
+	std::vector<RankingEntry> ranking_list;
+
 	int curr_platform;
 
 	ArcadeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), lines(sf::Lines, 2), sp(sp) {
 		this->player = p;
 		this->menu = true;
+		this->ranking = false;
 		this->menu_selected = 0;
+
+		this->names.push_back("aslogd");
+		this->names.push_back("dbnpm");
+		this->names.push_back("Pinkii");
+		this->names.push_back("kaitokidi");
+		this->names.push_back("mcoll");
+		this->names.push_back("xXx_D4rK_S3pH1R07h_xXx");
+		this->names.push_back("Legolaaasss");
+		this->names.push_back("raylib");
 
 		colors.push_back(sf::Color(255, 0, 255));
 		colors.push_back(sf::Color(125, 0, 125));
@@ -851,6 +879,10 @@ struct ArcadeGame {
 		this->exit_text.setString("EXIT");
 
 		this->sp->play_from_arcade("intro_track_arcade");
+
+		for (int i = 0; i < 12; ++i) {
+
+		}
 	}
 
 	void init() {
@@ -924,6 +956,10 @@ struct ArcadeGame {
 				}
 			}
 			
+			return;
+		}
+
+		if (this->ranking) {
 			return;
 		}
 
@@ -1036,7 +1072,14 @@ struct ArcadeGame {
 		}
 	}
 
-	void update(sf::Time dt) {}
+	void update(sf::Time dt) {
+		if(std::rand() % 600 == 0) {
+			int idx = std::rand() % this->names.size();
+			printf("%d\n", idx);
+
+			printf("%s\n", this->names[idx].c_str());
+		}
+	}
 
 	void render(sf::RenderTarget &target) {
 		if (this->menu) {
@@ -1088,6 +1131,15 @@ struct ArcadeGame {
 			target.draw(this->exit_text);
 
 			return;
+		}
+
+
+		if (this->menu) {
+			for (int i = 0; i <10; ++i) {
+				int idx = -i;
+				// sf::Text t (
+
+			}
 		}
 
 		int size = this->platforms.size();
@@ -1254,6 +1306,7 @@ int main() {
 		}
 		else {
 			rlg.update(dt);
+			ag.update(dt);
 			ag.update_active(dt);
 
 			texture.clear();
