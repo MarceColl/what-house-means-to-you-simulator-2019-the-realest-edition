@@ -85,7 +85,7 @@ struct Player {
 
 		this->curr_game = ARCADE;
 
-		this->arcade_pos = sf::Vector2f(W_WIDTH/2, 100.0);
+		this->arcade_pos = sf::Vector2f(W_WIDTH/4, 100.0);
 	}
 };
 
@@ -99,8 +99,17 @@ struct SoundPlayer {
 
 	float immersion;
 
+	struct FadeInOutData {
+		sf::Sound *sound;
+		double start_time;
+		double duration;
+		bool fade_in;
+		bool done;
+	};
+
 	std::queue<sf::Sound*> play_queue;
 	std::queue<sf::Sound*> stop_queue;
+	std::vector<FadeInOutData> fade_inout_queue;
 
  	SoundPlayer() {
 		this->beat = 0;
@@ -145,6 +154,57 @@ struct SoundPlayer {
 				}
 			}
 		}
+
+		for (int i = 0; i < this->fade_inout_queue.size(); ++i) {
+			FadeInOutData *n = &this->fade_inout_queue[i];
+
+			float vol = 100*((this->time - n->start_time)/n->duration);
+			if (!n->fade_in) {
+				vol = 100 - vol;
+			}
+
+			if (vol < 0.5 && !n->fade_in) {
+				n->sound->stop();
+				n->done = true;
+			}
+
+			if (vol >= 100 && n->fade_in) {
+				n->done = true;
+			}
+
+			n->sound->setVolume(vol);
+		}
+
+		for (int i = this->fade_inout_queue.size() - 1; i >= 0; --i) {
+			if (this->fade_inout_queue[i].done) {
+				this->fade_inout_queue.erase(this->fade_inout_queue.begin() + i);
+			}
+		}
+	}
+
+	void fade_out(std::string name, float time) {
+		FadeInOutData d = {
+			.sound = &this->sound[name],
+			.start_time = this->time,
+			.duration = time,
+			.fade_in = false
+		};
+
+		this->fade_inout_queue.push_back(d);
+	}
+
+	void fade_in(std::string name, float time) {
+		FadeInOutData d = {
+			.sound = &this->sound[name],
+			.start_time = this->time,
+			.duration = time,
+			.fade_in = true
+		};
+
+		d.sound->setVolume(0.0);
+		d.sound->play();
+
+		this->fade_inout_queue.push_back(d);
 	}
 
 	void add_layer(std::string name, bool loop) {
@@ -361,7 +421,6 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->player_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player_sprite.setOrigin(15/float(2), 30/float(2));
 	
-
 	this->vr_sprite.setTexture(this->vr_texture);
 	this->vr_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->vr_pos_y =  w_size.y / float(st_size.y);
@@ -667,12 +726,12 @@ struct ArcadeGame {
 		this->exit_text.setPosition(W_WIDTH/2, 3*W_HEIGHT/5.0);
 		this->exit_text.setString("EXIT");
 
-		this->init();
-
 		this->sp->play_from_arcade("intro_track_arcade");
 	}
 
 	void init() {
+		this->sp->fade_out("intro_track_arcade", 1.0);
+
 		this->current_good = 500.0;
 
 		this->bpm = 1200.0;
@@ -727,6 +786,10 @@ struct ArcadeGame {
 					this->menu_selected = 2;
 				}
 			}
+			if (input_array[ACTION]) {
+				this->menu = false;
+				this->init();
+			}
 			
 			return;
 		}
@@ -747,12 +810,9 @@ struct ArcadeGame {
 			this->reached_platforms = true;
 		}
 
-		if (this->current_good > 100 && this->current_good < 150) {
-			sp->add_layer("Kick", true);
-		}
-		if (this->current_good > 150) {
-			sp->add_layer("Snare", true);
-		}
+		sp->add_layer("Kick", true);
+		sp->add_layer("Snare", true);
+		sp->add_layer("Bass 1", true);
 		if (this->current_good > 650 && this->current_good < 750) {
 			sp->add_layer("Lead 1", true);
 			sp->stop_layer("Lead 2", true);
@@ -895,7 +955,7 @@ struct ArcadeGame {
 		for (int i = this->curr_platform; i < size * 2; ++i) {
 			Platform *p = &this->platforms[i%size];
 
-			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+			float x = p->start * this->ppb + W_WIDTH/4  - this->ppb * this->current_beat;
 
 			if (i > size) {
 				x += size * this->ppb;
@@ -916,7 +976,7 @@ struct ArcadeGame {
 			for (int i = 0; i < size * 2; ++i) {
 				Platform *p = &this->platforms[(this->curr_platform - i)%size];
 
-				float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+				float x = p->start * this->ppb + W_WIDTH/4  - this->ppb * this->current_beat;
 
 				if (i > this->curr_platform) {
 					x -= size * this->ppb;
@@ -1049,3 +1109,4 @@ int main() {
 
     return 0;
 }
+
