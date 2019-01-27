@@ -20,6 +20,7 @@ enum Input {
 	ACTION,
 	TOGGLE,
 	ARCADE_QUIT,
+	DROP,
 
 	// Always at the end
 	INPUT_COUNT
@@ -519,7 +520,9 @@ void RealLifeGame::update_debug(){
 	this->debug_text.setString(buffAsStdStr);
 }
 
-void RealLifeGame::update(sf::Time time) {}
+void RealLifeGame::update(sf::Time time) {
+	this->player->hunger_need += 0.01 * time.asSeconds();
+}
 
 void RealLifeGame::update_active(sf::Time time) {
 	/// ACTIONABLES
@@ -530,6 +533,7 @@ void RealLifeGame::update_active(sf::Time time) {
 		if (this->vr_pos_y > this->vr_top_pos) {
 			this->vr_pos_y -= time.asMilliseconds();
 		}
+		
 		for(int i = 0; i < this->actionables.size(); i++)
 		{
 			if(this->actionables[i].isReachable(this->player->real_life_pos.x)) {
@@ -544,30 +548,15 @@ void RealLifeGame::update_active(sf::Time time) {
 				}
 			}
 		}
-		/*
-		for (auto actionable : this->actionables) {
-			if(actionable.isReachable(this->player->real_life_pos.x)) {
-				if (actionable.auto_action) {
-					actionable.elapsed += time.asMilliseconds();
-					printf("%f > %f", actionable.elapsed, actionable.action_length);
-					if (actionable.elapsed > actionable.action_length) {
-						printf("Si");
-						actionable.elapsed = actionable.elapsed - actionable.action_length;
-						actionable.action(this, actionable);
-					}
-				} else {
-					this->reachable_actionables.push_back(actionable);
-				}
-			}
-		}
-		*/
+
 		// Keep selected in reachables
 		if (this->reachable_actionables.size() > 0) {
 			this->selected_reachable = this->selected_reachable % this->reachable_actionables.size();
-		} 
+		}
 		else {
 			this->selected_reachable = -1;
 		}
+
 		// Update reachable text
 		if (this->selected_reachable >= 0) {
 			Actionable a = this->reachable_actionables[this->selected_reachable];
@@ -879,6 +868,10 @@ struct ArcadeGame {
 			this->player->curr_game = REAL_LIFE;
 			printf("Exited arcade game\n");
 		}
+		else if (input_array[DROP]) {
+			this->speed.y = 1000;
+			printf("Exited arcade game\n");
+		}
 		
 		if (this->time > 1.0 && !this->reached_platforms) {
 			this->reached_platforms = true;
@@ -960,6 +953,7 @@ struct ArcadeGame {
 			if (this->score > this->player->high_score) {
 				this->player->high_score = this->score;
 			}
+			this->player->hunger_need += 0.1;
 			sp->play_from_arcade("FX_Gameover");
 			this->current_good -= 400;
 
@@ -1131,7 +1125,10 @@ int main() {
 				else if (event.key.code == sf::Keyboard::Z) {
 					input_array[TOGGLE] = true;
 					once_array[TOGGLE] = true;
-
+				}
+				else if (event.key.code == sf::Keyboard::D) {
+					input_array[DROP] = true;
+					once_array[DROP] = true;
 				}
 			}
 			else if (event.type == sf::Event::KeyReleased) {
@@ -1149,6 +1146,9 @@ int main() {
 				}
 				else if (event.key.code == sf::Keyboard::Z) {
 					input_array[TOGGLE] = false;
+				}
+				else if (event.key.code == sf::Keyboard::D) {
+					input_array[DROP] = false;
 				}
 			}
         }
@@ -1177,6 +1177,8 @@ int main() {
 		for (int i = 0; i < INPUT_COUNT; i++) {
 			once_array[i] = false;
 		}
+
+		printf("%f\n", player.hunger_need);
 
         window.display();
     }
