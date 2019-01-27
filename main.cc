@@ -1,3 +1,5 @@
+#include <ctime>
+#include <cstdlib>
 #include <stdio.h>
 #include <string.h>
 
@@ -952,8 +954,13 @@ struct ArcadeGame {
 
 		this->sp->play_from_arcade("intro_track_arcade");
 
-		for (int i = 0; i < 12; ++i) {
+		for (int i = 0; i < 5; ++i) {
+			RankingEntry e = {
+				.score = 12000*i + std::rand()%3000,
+				.name = this->names[i],
+			};
 
+			this->ranking_list.push_back(e);
 		}
 	}
 
@@ -1020,7 +1027,8 @@ struct ArcadeGame {
 					this->init();
 				}
 				else if (this->menu_selected == 1) {
-					// TODO(Marce): Implement ranking
+					this->menu = false;
+					this->ranking = true;
 				}
 				else if (this->menu_selected == 2) {
 					this->player->curr_game = REAL_LIFE;
@@ -1149,7 +1157,12 @@ struct ArcadeGame {
 			int idx = std::rand() % this->names.size();
 			printf("%d\n", idx);
 
-			printf("%s\n", this->names[idx].c_str());
+			RankingEntry e = {
+				.score = this->ranking_list[this->ranking_list.size() - 1].score + std::rand()%500,
+				.name = this->names[idx]
+			};
+
+			this->ranking_list.push_back(e);
 		}
 	}
 
@@ -1206,11 +1219,37 @@ struct ArcadeGame {
 		}
 
 
-		if (this->menu) {
-			for (int i = 0; i <10; ++i) {
-				int idx = -i;
-				// sf::Text t (
+		if (this->ranking) {
+			sf::RectangleShape rect;
+			int color_index = int(sin(this->time*8.0 + 0.5)*5.0);
 
+			rect.setPosition(W_WIDTH/2, 0);
+			for (int i = 0; i < 5; ++i) {
+				rect.setFillColor(colors[(i + color_index)%5]);
+				rect.setSize(sf::Vector2f(W_WIDTH - (W_WIDTH/7)*i, W_HEIGHT));
+				rect.setOrigin((W_WIDTH - (W_WIDTH/7)*i)/2, 0);
+				target.draw(rect);
+			}
+
+			for (int i = 1; i <= 5; ++i) {
+				char buff[100];
+				snprintf(buff, sizeof(buff), "%d", this->ranking_list[this->ranking_list.size() - i].score);
+				std::string buffAsStdStr = buff;
+				this->debug_text.setString(buffAsStdStr);
+
+				sf::Text t(this->ranking_list[this->ranking_list.size() - i].name, this->action_font);
+				sf::FloatRect size = t.getGlobalBounds();
+				t.setOrigin(sf::Vector2f(size.width/2, size.height/2));
+				t.setPosition(W_WIDTH/2, 100*i - 25);
+
+				sf::Text t2(buffAsStdStr, this->action_font);
+				t2.setCharacterSize(14);
+				sf::FloatRect size2 = t2.getGlobalBounds();
+				t2.setOrigin(sf::Vector2f(size2.width/2, size2.height/2));
+				t2.setPosition(W_WIDTH/2, 100*i + 25);
+
+				target.draw(t);
+				target.draw(t2);
 			}
 		}
 
@@ -1271,6 +1310,8 @@ struct ArcadeGame {
 };
 
 int main() {
+	std::srand(std::time(nullptr));
+
     sf::RenderWindow window(sf::VideoMode(W_WIDTH, W_HEIGHT), "SFML works!");
 	SoundPlayer sp = SoundPlayer();
 
@@ -1387,8 +1428,10 @@ int main() {
 			window.draw(sc_sprite, &bloom);
 		}
 
+		/*
 		window.draw(notif_sq);
 		window.draw(notif_text);
+		*/
 
 		for (int i = 0; i < INPUT_COUNT; i++) {
 			once_array[i] = false;
