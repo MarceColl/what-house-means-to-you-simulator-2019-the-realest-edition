@@ -295,7 +295,6 @@ struct SoundPlayer {
 };
 
 struct RealLifeGame {
-
 	enum Room {
 		BATHROOM,
 		DEN
@@ -542,7 +541,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 
 	this->mov_speed = 30;
 	this->action_reach = 50;
-	this->debug = false;
+	this->debug = true;
 
 	this->selected_reachable = 0;
 	/*
@@ -657,6 +656,7 @@ void RealLifeGame::update(sf::Time time) {
 }
 
 void RealLifeGame::update_active(sf::Time time) {
+	printf("RLG %f\n", time.asSeconds());
 	if(day) {
 		this->scene_texture = this->scene_texture_day;
 		this->player_texture_seated = this->player_texture_seated_day;
@@ -1069,6 +1069,7 @@ struct ArcadeGame {
 	}
 
 	void update_active(sf::Time dt) {
+		printf("%f\n", dt.asSeconds());
 		this->time += dt.asSeconds();
 
 		if (this->menu) {
