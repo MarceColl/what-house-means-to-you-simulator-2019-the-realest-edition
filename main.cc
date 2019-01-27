@@ -401,6 +401,8 @@ struct RealLifeGame {
 	int selected_reachable;
 	
 	sf::Texture scene_texture;
+	sf::Texture scene_texture_day;
+	sf::Texture scene_texture_night;
 	sf::Texture bathroom_texture;
 	sf::Sprite scene_sprite;
 
@@ -413,9 +415,12 @@ struct RealLifeGame {
 
 	sf::Texture player_texture_acting;
 	sf::Texture player_texture_acting_night;
+	sf::Texture player_texture_acting_day;
 	sf::Texture player_texture_seated;
-	sf::Texture player_texture_walking;
+	sf::Texture player_texture_seated_day;
 	sf::Texture player_texture_seated_night;
+	sf::Texture player_texture_walking;
+	sf::Texture player_texture_walking_day;
 	sf::Texture player_texture_walking_night;
 	sf::Sprite player_sprite;
 	Animation player_animation;
@@ -427,6 +432,8 @@ struct RealLifeGame {
 	sf::Text reachables_text;
 	sf::Text action_text;
 	sf::Text debug_text;
+
+	bool day;
 
 	float mov_speed;
 	float action_reach;
@@ -461,9 +468,13 @@ bool RealLifeGame::Actionable::isReachable(Room r, float x) {
 
 RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(0), sp(sp) {
 	this->player = p;
-	if (!this->scene_texture.loadFromFile("Images/room_dia.png")) {
+	if (!this->scene_texture_day.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
 	}
+	if (!this->scene_texture_night.loadFromFile("Images/room_nit.png")) {
+		printf("The scene was not found!\n");
+	}
+	this->scene_texture = this->scene_texture_day;
 	if (!this->bathroom_texture.loadFromFile("Images/bathroom.png")) {
 		printf("The bathroom not found!\n");
 	}
@@ -474,19 +485,19 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->scene_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player->real_life_pos.x = w_size.x *0.65;
 	this->player->real_life_pos.y = w_size.y *0.66;
-	if (!this->player_texture_acting.loadFromFile("Images/sprites_finals/giro_dia.png")) {
+	if (!this->player_texture_acting_day.loadFromFile("Images/sprites_finals/giro_dia.png")) {
 		printf("act not found!\n");
 	}
 	if (!this->player_texture_acting_night.loadFromFile("Images/sprites_finals/giro_nit.png")) {
 		printf("act not found!\n");
 	}
-	if (!this->player_texture_seated.loadFromFile("Images/sprites_finals/sit.png")) {
+	if (!this->player_texture_seated_day.loadFromFile("Images/sprites_finals/sit.png")) {
 		printf("sit not found!\n");
 	}
 	if (!this->player_texture_seated_night.loadFromFile("Images/sprites_finals/sit_nit.png")) {
 		printf("sit nit not found!\n");
 	}
-	if (!this->player_texture_walking.loadFromFile("Images/sprites_finals/walk.png")) {
+	if (!this->player_texture_walking_day.loadFromFile("Images/sprites_finals/walk.png")) {
 		printf("walk not found!\n");
 	}
 	if (!this->player_texture_walking_night.loadFromFile("Images/sprites_finals/walk_nit.png")) {
@@ -495,6 +506,11 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	if (!this->vr_texture.loadFromFile("Images/vr.png")) {
 		printf("vr!\n");
 	}
+	this->day = true;
+
+	this->player_texture_acting = this->player_texture_acting_day;
+	this->player_texture_seated = this->player_texture_seated_day;
+	this->player_texture_walking = this->player_texture_walking_day;
 	this->player_state = SEATED;
 	this->player_animation.length = 4;
 	this->player_animation.current_frame = 3;
@@ -607,9 +623,21 @@ void RealLifeGame::update_debug(){
 
 void RealLifeGame::update(sf::Time time) {
 	this->player->hunger_need += 0.01 * time.asSeconds();
+	this->day = !this->day;
 }
 
 void RealLifeGame::update_active(sf::Time time) {
+	if(day) {
+		this->scene_texture = this->scene_texture_day;
+		this->player_texture_seated = this->player_texture_seated_day;
+		this->player_texture_acting = this->player_texture_acting_day;
+		this->player_texture_walking = this->player_texture_walking_day;
+	} else {
+		this->scene_texture = this->scene_texture_night;
+		this->player_texture_seated = this->player_texture_seated_night;
+		this->player_texture_acting = this->player_texture_acting_night;
+		this->player_texture_walking = this->player_texture_walking_night;
+	}
 	sf::Vector2u w_size = window.getSize();
 	/// ACTIONABLES
 	this->reachable_actionables.clear();
