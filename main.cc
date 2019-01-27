@@ -117,6 +117,9 @@ struct SoundPlayer {
 		this->bpm = 130;
 
 		this->add_track("intro_track_arcade", "./Tracks/Intro Arcade.ogg");
+		this->add_track("real_life_track", "./Tracks/Real Life Soundscape.ogg");
+		this->sound["real_life_track"].setLoop(true);
+		this->add_track("crunch", "./FX/FX_Crunch.ogg");
 		this->add_track("FX_Gameover", "./FX/FX_Gameover.ogg");
 		this->add_track("Bass 1", "./Stages/1/Bass 1.ogg");
 		this->sound["Bass 1"].setLoop(true);
@@ -257,9 +260,26 @@ struct RealLifeGame {
 		sf::Vector2f position;
 		void (*action)(RealLifeGame*, Actionable);
 		int reach;
+
+		bool auto_action;
+		float elapsed;
+		float action_length;
+
 		bool visible;
 		sf::Texture texture;
 		sf::Sprite sprite;
+		
+		Actionable() {
+			this->id = -1;
+			this->action_message = "";
+			this->position = sf::Vector2f(0.0,0.0);
+			this->reach = 20;
+			this->auto_action = false;
+			this->elapsed = 0;
+			this->action_length = 1000;
+			this->visible = false;
+
+		}
 
 		bool isReachable(float x);
 	};
@@ -382,6 +402,7 @@ struct RealLifeGame {
 ////////////////////
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
 
 bool RealLifeGame::Actionable::isReachable(float x) {
@@ -431,7 +452,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->vr_bottom_pos = 0;
 	this->vr_top_pos = -100;
 
-	this->mov_speed = 0.1;
+	this->mov_speed = 30;
 	this->action_reach = 50;
 	this->debug = false;
 
@@ -451,8 +472,22 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.action_message = "Press 'x' to sit on the couch";
 	couch.position.x = w_size.x *0.65;
 	couch.position.y = w_size.x *0.66;
-
+	couch.auto_action = false;
+	couch.visible = false;
 	this->actionables.push_back(couch);
+
+	Actionable doritos;
+	doritos.id = 1;
+	doritos.reach = 40;
+	doritos.action = crunch;
+	doritos.action_message = "";
+	doritos.position.x = w_size.x *0.54;
+	doritos.position.y = w_size.x *0.66;
+	doritos.auto_action = true;
+	doritos.action_length = 500;
+	doritos.elapsed = 0;
+	doritos.visible = false;
+	this->actionables.push_back(doritos);
 
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
@@ -495,11 +530,37 @@ void RealLifeGame::update_active(sf::Time time) {
 		if (this->vr_pos_y > this->vr_top_pos) {
 			this->vr_pos_y -= time.asMilliseconds();
 		}
-		for (auto actionable : this->actionables) {
-			if(actionable.isReachable(this->player->real_life_pos.x)) {
-				this->reachable_actionables.push_back(actionable);
+		for(int i = 0; i < this->actionables.size(); i++)
+		{
+			if(this->actionables[i].isReachable(this->player->real_life_pos.x)) {
+				if (this->actionables[i].auto_action) {
+					this->actionables[i].elapsed += time.asMilliseconds();
+					if (this->actionables[i].elapsed > this->actionables[i].action_length) {
+						this->actionables[i].elapsed = this->actionables[i].elapsed - this->actionables[i].action_length;
+						this->actionables[i].action(this, this->actionables[i]);
+					}
+				} else {
+					this->reachable_actionables.push_back(this->actionables[i]);
+				}
 			}
 		}
+		/*
+		for (auto actionable : this->actionables) {
+			if(actionable.isReachable(this->player->real_life_pos.x)) {
+				if (actionable.auto_action) {
+					actionable.elapsed += time.asMilliseconds();
+					printf("%f > %f", actionable.elapsed, actionable.action_length);
+					if (actionable.elapsed > actionable.action_length) {
+						printf("Si");
+						actionable.elapsed = actionable.elapsed - actionable.action_length;
+						actionable.action(this, actionable);
+					}
+				} else {
+					this->reachable_actionables.push_back(actionable);
+				}
+			}
+		}
+		*/
 		// Keep selected in reachables
 		if (this->reachable_actionables.size() > 0) {
 			this->selected_reachable = this->selected_reachable % this->reachable_actionables.size();
@@ -548,7 +609,7 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_animation.loop = true;
 		}
 		if (this->player_state == WALKING) {
-			this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed;
+			this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
 		}
 	}
 	else if (input_array[RIGHT]) {
@@ -559,7 +620,7 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->player_animation.loop = true;
 		}
 		if (this->player_state == WALKING) {
-			this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed;
+			this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
 		}
 	} else {
 		if(this->player_state == WALKING) { 
@@ -578,6 +639,7 @@ void RealLifeGame::update_active(sf::Time time) {
 		} else if (this->player_state == SEATED) {
 			this->player_state = STANDING;
 			this->player_animation.inverted = true;
+			this->sp->fade_in("real_life_track", 1.0);
 		}
 	}
 	else if (once_array[TOGGLE]) {
@@ -645,6 +707,10 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player_animation.loop = false;
 	rlg->player_animation.current_frame = 0;
 	rlg->action_text.setString("");
+}
+
+void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->sp->play_from_arcade("crunch");
 }
 
 struct ArcadeGame {
