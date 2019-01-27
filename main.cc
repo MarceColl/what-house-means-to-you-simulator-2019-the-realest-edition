@@ -257,6 +257,9 @@ struct RealLifeGame {
 		sf::Vector2f position;
 		void (*action)(RealLifeGame*, Actionable);
 		int reach;
+		bool visible;
+		sf::Texture texture;
+		sf::Sprite sprite;
 
 		bool isReachable(float x);
 	};
@@ -450,7 +453,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.position.y = w_size.x *0.66;
 
 	this->actionables.push_back(couch);
-	
+
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
 		printf("The font was not found!\n");
@@ -575,7 +578,6 @@ void RealLifeGame::update_active(sf::Time time) {
 		} else if (this->player_state == SEATED) {
 			this->player_state = STANDING;
 			this->player_animation.inverted = true;
-			this->player_animation.to_string();
 		}
 	}
 	else if (once_array[TOGGLE]) {
