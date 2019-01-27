@@ -271,6 +271,7 @@ struct RealLifeGame {
 		float elapsed_since_last;
 
 		Animation() {
+			this->elapsed_since_last =0;
 			this->inverted = false;
 			this->loop = true;
 			this->frame_length = 1000;
@@ -306,7 +307,7 @@ struct RealLifeGame {
 					this->current_frame = 0;
 				}
 				else if (this->current_frame >= this->length) {
-					this->current_frame--;
+					this->current_frame = this->length-1;
 				}
 			}
 		}
@@ -574,6 +575,7 @@ void RealLifeGame::update_active(sf::Time time) {
 		} else if (this->player_state == SEATED) {
 			this->player_state = STANDING;
 			this->player_animation.inverted = true;
+			this->player_animation.to_string();
 		}
 	}
 	else if (once_array[TOGGLE]) {
