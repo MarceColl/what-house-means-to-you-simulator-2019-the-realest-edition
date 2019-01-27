@@ -431,6 +431,10 @@ struct RealLifeGame {
 	sf::Sprite shower_sprite;
 	Animation shower_anim;
 
+	sf::Texture garbage_texture;
+	sf::Sprite garbage_sprite;
+	Animation garbage_anim;
+
 	sf::Texture scene_texture;
 	sf::Texture scene_texture_day;
 	sf::Texture scene_texture_night;
@@ -582,7 +586,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 
 	this->mov_speed = 30;
 	this->action_reach = 50;
-	this->debug = true;
+	this->debug = false;
 
 	this->selected_reachable = 0;
 	/*
@@ -683,6 +687,18 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->shower_anim.frame_length = 200;
 	this->shower_anim.rect_size = sf::Vector2i(19, 51);
 	
+	if (this->garbage_texture.loadFromFile("Images/sprites_finals/basura.png")) {
+		printf("shower!\n");
+	}
+	this->garbage_sprite.setTexture(this->garbage_texture);
+	this->garbage_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
+	this->garbage_sprite.setPosition(this->w_size.x *0.75, this->w_size.y *0.66);
+	this->garbage_anim.length = 4;
+	this->garbage_anim.current_frame = 0;
+	this->garbage_anim.loop = true;
+	this->garbage_anim.inverted = false;
+	this->garbage_anim.frame_length = 100;
+	this->garbage_anim.rect_size = sf::Vector2i(17, 30);
 
 
 	Actionable bottle;
@@ -953,6 +969,9 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->shower_anim.update(time);
 	this->shower_sprite.setTextureRect(this->shower_anim.get_rekt());
 
+	this->garbage_anim.update(time);
+	this->garbage_sprite.setTextureRect(this->garbage_anim.get_rekt());
+
 	float x = 0;
 	
 	if (this->player_state == SEATED && !this->player->dead) {
@@ -992,6 +1011,7 @@ void RealLifeGame::render(){
 	if (this->current_room == DEN) {
 		this->window.draw(this->vr_sprite);
 		this->window.draw(this->tv_sprite);
+		this->window.draw(this->garbage_sprite);
 	} 
 
 	if (this->debug) {
