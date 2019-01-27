@@ -1,3 +1,5 @@
+#include <ctime>
+#include <cstdlib>
 #include <stdio.h>
 #include <string.h>
 
@@ -132,6 +134,7 @@ struct SoundPlayer {
 		this->add_track("real_life_track", "./Tracks/Real Life Soundscape.ogg");
 		this->sound["real_life_track"].setLoop(true);
 		this->add_track("crunch", "./FX/FX_Crunch.ogg");
+		this->add_track("pee_need", "./FX/FX_Pee Need.ogg");
 		this->add_track("eat", "./FX/FX_Eat.ogg");
 		this->add_track("fart", "./FX/FX_Fart.ogg");
 		this->add_track("pee", "./FX/FX_Pee.ogg");
@@ -289,13 +292,14 @@ struct SoundPlayer {
 	}
 
 	void play_from_real_life(std::string name) {
-		this->sound[name].setVolume(100.0 - this->immersion);
-		this->sound[name].play();
+		// this->sound[name].setVolume(100.0 - this->immersion);
+		if (this->sound[name].getStatus() != sf::SoundSource::Status::Playing) {
+			this->sound[name].play();
+		}
 	}
 };
 
 struct RealLifeGame {
-
 	enum Room {
 		BATHROOM,
 		DEN
@@ -543,7 +547,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 
 	this->mov_speed = 30;
 	this->action_reach = 50;
-	this->debug = false;
+	this->debug = true;
 
 	this->selected_reachable = 0;
 	/*
@@ -648,10 +652,17 @@ void RealLifeGame::update_debug(){
 
 void RealLifeGame::update(sf::Time time) {
 	this->player->hunger_need += 0.01 * time.asSeconds();
+	this->player->pee_need += 0.05 * time.asSeconds();
+
+	if (this->player->pee_need > 0.8) {
+		this->sp->play_from_real_life("pee_need");
+	}
+
 	this->day = !this->day;
 }
 
 void RealLifeGame::update_active(sf::Time time) {
+	printf("RLG %f\n", time.asSeconds());
 	if(day) {
 		this->scene_texture = this->scene_texture_day;
 		this->player_texture_seated = this->player_texture_seated_day;
@@ -1011,8 +1022,13 @@ struct ArcadeGame {
 
 		this->sp->play_from_arcade("intro_track_arcade");
 
-		for (int i = 0; i < 12; ++i) {
+		for (int i = 0; i < 5; ++i) {
+			RankingEntry e = {
+				.score = 12000*i + std::rand()%3000,
+				.name = this->names[i],
+			};
 
+			this->ranking_list.push_back(e);
 		}
 	}
 
@@ -1061,6 +1077,7 @@ struct ArcadeGame {
 	}
 
 	void update_active(sf::Time dt) {
+		printf("%f\n", dt.asSeconds());
 		this->time += dt.asSeconds();
 
 		if (this->menu) {
@@ -1079,7 +1096,8 @@ struct ArcadeGame {
 					this->init();
 				}
 				else if (this->menu_selected == 1) {
-					// TODO(Marce): Implement ranking
+					this->menu = false;
+					this->ranking = true;
 				}
 				else if (this->menu_selected == 2) {
 					this->player->curr_game = REAL_LIFE;
@@ -1208,7 +1226,12 @@ struct ArcadeGame {
 			int idx = std::rand() % this->names.size();
 			printf("%d\n", idx);
 
-			printf("%s\n", this->names[idx].c_str());
+			RankingEntry e = {
+				.score = this->ranking_list[this->ranking_list.size() - 1].score + std::rand()%500,
+				.name = this->names[idx]
+			};
+
+			this->ranking_list.push_back(e);
 		}
 	}
 
@@ -1265,11 +1288,37 @@ struct ArcadeGame {
 		}
 
 
-		if (this->menu) {
-			for (int i = 0; i <10; ++i) {
-				int idx = -i;
-				// sf::Text t (
+		if (this->ranking) {
+			sf::RectangleShape rect;
+			int color_index = int(sin(this->time*8.0 + 0.5)*5.0);
 
+			rect.setPosition(W_WIDTH/2, 0);
+			for (int i = 0; i < 5; ++i) {
+				rect.setFillColor(colors[(i + color_index)%5]);
+				rect.setSize(sf::Vector2f(W_WIDTH - (W_WIDTH/7)*i, W_HEIGHT));
+				rect.setOrigin((W_WIDTH - (W_WIDTH/7)*i)/2, 0);
+				target.draw(rect);
+			}
+
+			for (int i = 1; i <= 5; ++i) {
+				char buff[100];
+				snprintf(buff, sizeof(buff), "%d", this->ranking_list[this->ranking_list.size() - i].score);
+				std::string buffAsStdStr = buff;
+				this->debug_text.setString(buffAsStdStr);
+
+				sf::Text t(this->ranking_list[this->ranking_list.size() - i].name, this->action_font);
+				sf::FloatRect size = t.getGlobalBounds();
+				t.setOrigin(sf::Vector2f(size.width/2, size.height/2));
+				t.setPosition(W_WIDTH/2, 100*i - 25);
+
+				sf::Text t2(buffAsStdStr, this->action_font);
+				t2.setCharacterSize(14);
+				sf::FloatRect size2 = t2.getGlobalBounds();
+				t2.setOrigin(sf::Vector2f(size2.width/2, size2.height/2));
+				t2.setPosition(W_WIDTH/2, 100*i + 25);
+
+				target.draw(t);
+				target.draw(t2);
 			}
 		}
 
@@ -1330,6 +1379,8 @@ struct ArcadeGame {
 };
 
 int main() {
+	std::srand(std::time(nullptr));
+
     sf::RenderWindow window(sf::VideoMode(W_WIDTH, W_HEIGHT), "SFML works!");
 	SoundPlayer sp = SoundPlayer();
 
@@ -1446,8 +1497,10 @@ int main() {
 			window.draw(sc_sprite, &bloom);
 		}
 
+		/*
 		window.draw(notif_sq);
 		window.draw(notif_text);
+		*/
 
 		for (int i = 0; i < INPUT_COUNT; i++) {
 			once_array[i] = false;
