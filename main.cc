@@ -299,7 +299,6 @@ struct SoundPlayer {
 
 	void play_from_real_life(std::string name) {
 		if (name == "fart") {
-			printf("DEADDDD");
 			this->sound["Kick"].stop();
 			this->sound["Snare"].stop();
 			this->sound["Bass 1"].stop();
@@ -437,6 +436,12 @@ struct RealLifeGame {
 	sf::Texture tv_texture;
 	sf::Sprite tv_sprite;
 
+	sf::Texture credits_texture;
+	sf::Sprite credits_sprite;
+
+	sf::Texture title_texture;
+	sf::Sprite title_sprite;
+
 	sf::Texture shower_texture;
 	sf::Sprite shower_sprite;
 	Animation shower_anim;
@@ -567,6 +572,12 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	if (!this->tv_texture.loadFromFile("Images/tv.png")) {
 		printf("tv!\n");
 	}
+	if (!this->credits_texture.loadFromFile("Images/credits.png")) {
+		printf("credits!\n");
+	}
+	if (!this->title_texture.loadFromFile("Images/TITOL.png")) {
+		printf("title!\n");
+	}
 
 	this->day = true;
 
@@ -593,6 +604,14 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->tv_sprite.setTexture(this->tv_texture);
 	this->tv_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
 	this->tv_sprite.setPosition(this->w_size.x*0.30, this->w_size.y*0.73);
+
+	this->credits_sprite.setTexture(this->credits_texture);
+	this->credits_sprite.setScale(0.65, 0.65);
+	this->credits_sprite.setPosition(0, 270);
+
+	this->title_sprite.setTexture(this->title_texture);
+	this->title_sprite.setScale(0.65, 0.65);
+	this->title_sprite.setPosition(0, -100);
 
 	this->mov_speed = 30;
 	this->action_reach = 50;
@@ -955,7 +974,13 @@ void RealLifeGame::update_active(sf::Time time) {
 				this->shower_anim.inverted = true;
 				this->player_state = ENDING_ACTION;
 				this->player_animation.inverted = true;
-			} else {
+			} 
+			else if(!this->showering) {
+				this->player_state = ENDING_ACTION;
+				this->player_animation.inverted = true;
+				this->shower_anim.current_frame = 0;
+			}
+			else {
 				this->shower_anim.current_frame = 0;
 			}
 		}
@@ -1002,6 +1027,8 @@ void RealLifeGame::update_active(sf::Time time) {
 
 void RealLifeGame::render(){
 	if (this->credits) {
+		this->window.draw(this->title_sprite);
+		this->window.draw(this->credits_sprite);
 		return;
 	}
 
