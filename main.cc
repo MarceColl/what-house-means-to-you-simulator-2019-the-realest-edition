@@ -412,6 +412,9 @@ struct RealLifeGame {
 	std::vector<Actionable> reachable_actionables;
 	int selected_reachable;
 	
+	sf::Texture tv_texture;
+	sf::Sprite tv_sprite;
+
 	sf::Texture scene_texture;
 	sf::Texture scene_texture_day;
 	sf::Texture scene_texture_night;
@@ -523,6 +526,10 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	if (!this->vr_texture.loadFromFile("Images/vr.png")) {
 		printf("vr!\n");
 	}
+	if (!this->tv_texture.loadFromFile("Images/tv.png")) {
+		printf("tv!\n");
+	}
+
 	this->day = true;
 
 	this->player_texture_acting = this->player_texture_acting_day;
@@ -544,6 +551,10 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->vr_pos_y =  this->w_size.y / float(st_size.y);
 	this->vr_bottom_pos = 0;
 	this->vr_top_pos = -100;
+
+	this->tv_sprite.setTexture(this->tv_texture);
+	this->tv_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
+	this->tv_sprite.setPosition(this->w_size.x*0.30, this->w_size.y*0.73);
 
 	this->mov_speed = 30;
 	this->action_reach = 50;
@@ -866,6 +877,7 @@ void RealLifeGame::render(){
 	this->window.draw(this->action_text);
 	if (this->current_room == DEN) {
 		this->window.draw(this->vr_sprite);
+		this->window.draw(this->tv_sprite);
 	}
 
 	if (this->debug) {
