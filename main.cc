@@ -472,7 +472,7 @@ void RealLifeGame::update_active(sf::Time time) {
 
 		// IF DUDE IS SITING, nope
 		this->action_text.setPosition(this->player->real_life_pos.x - 250, this->player->real_life_pos.y - 200);
-		this->action_text.setString("Press 'x' to stand");
+		this->action_text.setString("Press 'x' to stand or 'z' to enter game");
 	}
 
 
@@ -518,7 +518,11 @@ void RealLifeGame::update_active(sf::Time time) {
 		}
 	}
 	else if (once_array[TOGGLE]) {
-		this->selected_reachable = (this->selected_reachable+1) % this->reachable_actionables.size();
+		if (this->player_state == SEATED) {
+			this->player->curr_game = ARCADE;			
+		} else {
+			this->selected_reachable = (this->selected_reachable+1) % this->reachable_actionables.size();
+		}
 	}
 	//APPLY PLAYER STATE TO ANIMATION (maybe bad idea every tick?)
 	if(this->player_state == SEATED || this->player_state == STANDING || this->player_state == SEATING) {
