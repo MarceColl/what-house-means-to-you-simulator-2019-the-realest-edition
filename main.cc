@@ -129,6 +129,11 @@ struct SoundPlayer {
 		this->add_track("real_life_track", "./Tracks/Real Life Soundscape.ogg");
 		this->sound["real_life_track"].setLoop(true);
 		this->add_track("crunch", "./FX/FX_Crunch.ogg");
+		this->add_track("eat", "./FX/FX_Eat.ogg");
+		this->add_track("fart", "./FX/FX_Fart.ogg");
+		this->add_track("pee", "./FX/FX_Pee.ogg");
+		this->add_track("vr", "./FX/FX_VR.ogg");
+		this->add_track("wc", "./FX/FX_WC.ogg");
 		this->add_track("FX_Gameover", "./FX/FX_Gameover.ogg");
 		this->add_track("Bass 1", "./Stages/1/Bass 1.ogg");
 		this->sound["Bass 1"].setLoop(true);
@@ -316,7 +321,7 @@ struct RealLifeGame {
 
 		}
 
-		bool isReachable(float x);
+		bool isReachable(Room r, float x);
 	};
 
 	struct Animation {
@@ -379,6 +384,8 @@ struct RealLifeGame {
 		SEATED,
 		STANDING,
 		SEATING,
+		STARTING_ACTION,
+		ENDING_ACTION,
 		IDLE,
 		WALKING
 	};
@@ -404,6 +411,8 @@ struct RealLifeGame {
 	float vr_pos_y;
 
 
+	sf::Texture player_texture_acting;
+	sf::Texture player_texture_acting_night;
 	sf::Texture player_texture_seated;
 	sf::Texture player_texture_walking;
 	sf::Texture player_texture_seated_night;
@@ -440,10 +449,13 @@ struct RealLifeGame {
 ////////////////////
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void pee(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void feed(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
 
-bool RealLifeGame::Actionable::isReachable(float x) {
+bool RealLifeGame::Actionable::isReachable(Room r, float x) {
+	if(r != this->room) return false;
 	return abs(x - this->position.x) < this->reach;
 }
 
@@ -462,6 +474,12 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->scene_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player->real_life_pos.x = w_size.x *0.65;
 	this->player->real_life_pos.y = w_size.y *0.66;
+	if (!this->player_texture_acting.loadFromFile("Images/sprites_finals/giro_dia.png")) {
+		printf("act not found!\n");
+	}
+	if (!this->player_texture_acting_night.loadFromFile("Images/sprites_finals/giro_nit.png")) {
+		printf("act not found!\n");
+	}
 	if (!this->player_texture_seated.loadFromFile("Images/sprites_finals/sit.png")) {
 		printf("sit not found!\n");
 	}
@@ -519,10 +537,22 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.visible = false;
 	this->actionables.push_back(couch);
 
+	Actionable fridge;
+	couch.id = 0;
+	couch.room = DEN;
+	couch.reach = 30;
+	couch.action = feed;
+	couch.action_message = "Press 'x' to feed yourself";
+	couch.position.x = w_size.x *0.25;
+	couch.position.y = w_size.x *0.66;
+	couch.auto_action = false;
+	couch.visible = false;
+	this->actionables.push_back(couch);
+
 	Actionable doritos;
 	doritos.id = 1;
 	doritos.reach = 40;
-	couch.room = DEN;
+	doritos.room = DEN;
 	doritos.action = crunch;
 	doritos.action_message = "";
 	doritos.position.x = w_size.x *0.54;
@@ -533,6 +563,18 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	doritos.visible = false;
 	this->actionables.push_back(doritos);
 
+
+	Actionable lavabo;
+	lavabo.id = 1;
+	lavabo.reach = 20;
+	lavabo.room = BATHROOM;
+	lavabo.action = pee;
+	couch.action_message = "Press 'x' to pee";
+	couch.position.x = w_size.x *0.85;
+	couch.position.y = w_size.x *0.66;
+	lavabo.auto_action = false;
+	lavabo.visible = false;
+	this->actionables.push_back(lavabo);
 
 	if (!this->action_font.loadFromFile("pixelart.ttf")) {
 		printf("The font was not found!\n");
@@ -580,7 +622,7 @@ void RealLifeGame::update_active(sf::Time time) {
 
 		for(int i = 0; i < this->actionables.size(); i++)
 		{
-			if(this->actionables[i].isReachable(this->player->real_life_pos.x)) {
+			if(this->actionables[i].isReachable(this->current_room, this->player->real_life_pos.x)) {
 				if (this->actionables[i].auto_action) {
 					this->actionables[i].elapsed += time.asMilliseconds();
 					if (this->actionables[i].elapsed > this->actionables[i].action_length) {
@@ -605,7 +647,7 @@ void RealLifeGame::update_active(sf::Time time) {
 		if (this->selected_reachable >= 0) {
 			Actionable a = this->reachable_actionables[this->selected_reachable];
 			float width = this->action_text.getLocalBounds().width;
-			this->action_text.setPosition(a.position.x - (width/2.0), a.position.y-50);
+			this->action_text.setPosition(a.position.x - (width/2.0), a.position.y-150);
 			this->action_text.setString(a.action_message);
 		} else {
 			this->action_text.setString("");
@@ -708,7 +750,17 @@ void RealLifeGame::update_active(sf::Time time) {
 		}
 	}
 	//APPLY PLAYER STATE TO ANIMATION (maybe bad idea every tick?)
-	if(this->player_state == SEATED || this->player_state == STANDING || this->player_state == SEATING) {
+	if(this->player_state == STARTING_ACTION || this->player_state == ENDING_ACTION){
+		this->player_sprite.setTexture(this->player_texture_acting);
+		if(this->player_state == STARTING_ACTION && this->player_animation.current_frame == 3) {
+			this->player_state = ENDING_ACTION;
+			this->player_animation.inverted = true;
+		}
+		if(this->player_state == ENDING_ACTION && this->player_animation.current_frame == 0) {
+			this->player_state = IDLE;
+		}
+	}
+	else if(this->player_state == SEATED || this->player_state == STANDING || this->player_state == SEATING) {
 		this->player_sprite.setTexture(this->player_texture_seated);
 		if (this->player_state == STANDING && this->player_animation.current_frame == 0) {
 			this->player_state = IDLE;
@@ -744,7 +796,9 @@ void RealLifeGame::render(){
 	this->window.draw(this->player_sprite);
 	this->window.draw(this->reachables_text);
 	this->window.draw(this->action_text);
-	this->window.draw(this->vr_sprite);
+	if (this->current_room == DEN) {
+		this->window.draw(this->vr_sprite);
+	}
 
 	if (this->debug) {
 		this->window.draw(this->debug_text);
@@ -765,6 +819,24 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player_animation.loop = false;
 	rlg->player_animation.current_frame = 0;
 	rlg->action_text.setString("");
+}
+
+void pee(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player->pee_need = 0.0;
+	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->sp->play_from_arcade("pee");
+}
+
+void feed(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player->hunger_need = 0.0;
+	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->sp->play_from_arcade("eat");
 }
 
 void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a) {
