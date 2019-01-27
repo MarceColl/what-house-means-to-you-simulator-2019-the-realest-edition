@@ -653,23 +653,23 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	lavabo.room = BATHROOM;
 	lavabo.action = pee;
 	lavabo.action_message = "Press 'x' to pee";
-	lavabo.position.x = this->w_size.x *0.90;
+	lavabo.position.x = this->w_size.x *0.80;
 	lavabo.position.y = this->w_size.y *0.66;
 	lavabo.auto_action = false;
 	lavabo.visible = false;
 	this->actionables.push_back(lavabo);
 
-	Actionable shower;
-	shower.id = 2;
-	shower.reach = 30;
-	shower.room = BATHROOM;
-	shower.action = pee;
-	shower.action_message = "Press 'x' to gain \nsome dignity";
-	shower.position.x = this->w_size.x *0.65;
-	shower.position.y = this->w_size.y *0.66;
-	shower.auto_action = false;
-	shower.visible = false;
-	this->actionables.push_back(shower);
+	Actionable sho;
+	sho.id = 2;
+	sho.reach = 30;
+	sho.room = BATHROOM;
+	sho.action = shower;
+	sho.action_message = "Press 'x' to gain \nsome dignity";
+	sho.position.x = this->w_size.x *0.65;
+	sho.position.y = this->w_size.y *0.66;
+	sho.auto_action = false;
+	sho.visible = false;
+	this->actionables.push_back(sho);
 	if (this->shower_texture.loadFromFile("Images/shower.png")) {
 		printf("shower!\n");
 	}
@@ -681,7 +681,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->shower_anim.loop = false;
 	this->shower_anim.inverted = true;
 	this->shower_anim.frame_length = 200;
-	this->shower_anim.rect_size = sf::Vector2i(20, 51);
+	this->shower_anim.rect_size = sf::Vector2i(19, 51);
 	
 
 
@@ -742,8 +742,8 @@ void RealLifeGame::update(sf::Time time) {
 }
 
 void RealLifeGame::update_active(sf::Time time) {
-	printf("RLG %f\n", time.asSeconds());
-	if(day) {
+	//printf("RLG %f\n", time.asSeconds());
+	if(day || this->current_room == BATHROOM) {
 		this->scene_texture = this->scene_texture_day;
 		this->player_texture_seated = this->player_texture_seated_day;
 		this->player_texture_acting = this->player_texture_acting_day;
@@ -921,12 +921,14 @@ void RealLifeGame::update_active(sf::Time time) {
 			this->shower_anim.inverted = false;
 		}
 		if(this->player_state == STARTING_ACTION && this->player_animation.current_frame == 3) {
-			if (this->showering) {
+			if (this->showering && this->shower_anim.current_frame == 3) {
 				this->showering = false;
 				this->shower_anim.inverted = true;
+				this->player_state = ENDING_ACTION;
+				this->player_animation.inverted = true;
+			} else {
+				this->shower_anim.current_frame = 0;
 			}
-			this->player_state = ENDING_ACTION;
-			this->player_animation.inverted = true;
 		}
 		if(this->player_state == ENDING_ACTION && this->player_animation.current_frame == 0) {
 			this->player_state = IDLE;
@@ -980,11 +982,13 @@ void RealLifeGame::render(){
 	}
 	this->window.draw(this->reachables_text);
 	this->window.draw(this->action_text);
+	/*
 	for (int i = 0; i < this->actionables.size(); i++) {
 		if (this->actionables[i].visible && this->current_room == this->actionables[i].room) {	
 			this->window.draw(this->actionables[i].sprite);
 		}
 	}
+	*/
 	if (this->current_room == DEN) {
 		this->window.draw(this->vr_sprite);
 		this->window.draw(this->tv_sprite);
@@ -1017,6 +1021,16 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->sp->play_from_arcade_with_offset("vr", sf::seconds(0.8));
 }
 
+void shower(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player->fuckedness = 0.0;
+	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->showering = true;
+	rlg->sp->play_from_arcade("showering");
+}
+
 void pee(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player->pee_need = 0.0;
 	rlg->player->fuckedness -= 0.3;
@@ -1035,16 +1049,6 @@ void pee_bottle(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player_animation.loop = false;
 	rlg->player_animation.current_frame = 0;
 	rlg->sp->play_from_arcade("pee");
-}
-
-void shower(RealLifeGame *rlg, RealLifeGame::Actionable a) {
-	rlg->player->fuckedness = 0.0;
-	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
-	rlg->player_animation.inverted = false;
-	rlg->player_animation.loop = false;
-	rlg->player_animation.current_frame = 0;
-	rlg->showering = true;
-	rlg->sp->play_from_arcade("showering");
 }
 
 void feed(RealLifeGame *rlg, RealLifeGame::Actionable a) {
