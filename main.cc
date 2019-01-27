@@ -136,6 +136,7 @@ struct SoundPlayer {
 		this->add_track("crunch", "./FX/FX_Crunch.ogg");
 		this->add_track("pee_need", "./FX/FX_Pee Need.ogg");
 		this->add_track("eat", "./FX/FX_Eat.ogg");
+		this->add_track("showering", "./FX/FX_Shower.ogg");
 		this->add_track("fart", "./FX/FX_Fart.ogg");
 		this->add_track("pee", "./FX/FX_Pee.ogg");
 		this->add_track("vr", "./FX/FX_VR.ogg");
@@ -304,37 +305,6 @@ struct RealLifeGame {
 		BATHROOM,
 		DEN
 	};
-	struct Actionable {
-		int id;
-		std::string action_message;
-		sf::Vector2f position;
-		void (*action)(RealLifeGame*, Actionable);
-		int reach;
-
-		bool auto_action;
-		float elapsed;
-		float action_length;
-
-		bool visible;
-		sf::Texture texture;
-		sf::Sprite sprite;
-
-		Room room;
-		
-		Actionable() {
-			this->id = -1;
-			this->action_message = "";
-			this->position = sf::Vector2f(0.0,0.0);
-			this->reach = 20;
-			this->auto_action = false;
-			this->elapsed = 0;
-			this->action_length = 1000;
-			this->visible = false;
-
-		}
-
-		bool isReachable(Room r, float x);
-	};
 
 	struct Animation {
 		int length;
@@ -392,6 +362,39 @@ struct RealLifeGame {
 		}
 	};
 
+	struct Actionable {
+		int id;
+		std::string action_message;
+		sf::Vector2f position;
+		void (*action)(RealLifeGame*, Actionable);
+		int reach;
+
+		bool auto_action;
+		float elapsed;
+		float action_length;
+
+		bool visible;
+		sf::Texture texture;
+		sf::Sprite sprite;
+		Animation anim;
+
+		Room room;
+		
+		Actionable() {
+			this->id = -1;
+			this->action_message = "";
+			this->position = sf::Vector2f(0.0,0.0);
+			this->reach = 20;
+			this->auto_action = false;
+			this->elapsed = 0;
+			this->action_length = 1000;
+			this->visible = false;
+
+		}
+
+		bool isReachable(Room r, float x);
+	};
+
 	enum PlayerState {
 		SEATED,
 		STANDING,
@@ -414,6 +417,10 @@ struct RealLifeGame {
 	
 	sf::Texture tv_texture;
 	sf::Sprite tv_sprite;
+
+	sf::Texture shower_texture;
+	sf::Sprite shower_sprite;
+	Animation shower_anim;
 
 	sf::Texture scene_texture;
 	sf::Texture scene_texture_day;
@@ -451,6 +458,7 @@ struct RealLifeGame {
 
 	bool day;
 	sf::Vector2u w_size;
+	bool showering;
 
 	float mov_speed;
 	float action_reach;
@@ -474,6 +482,7 @@ struct RealLifeGame {
 void pay_respects(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pee(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void shower(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void feed(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
@@ -485,6 +494,7 @@ bool RealLifeGame::Actionable::isReachable(Room r, float x) {
 
 RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(0), sp(sp) {
 	this->player = p;
+	this->showering = false;
 	if (!this->scene_texture_day.loadFromFile("Images/room_dia.png")) {
 		printf("The scene was not found!\n");
 	}
@@ -608,6 +618,8 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->actionables.push_back(doritos);
 
 
+
+
 	Actionable lavabo;
 	lavabo.id = 2;
 	lavabo.reach = 30;
@@ -619,6 +631,32 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	lavabo.auto_action = false;
 	lavabo.visible = false;
 	this->actionables.push_back(lavabo);
+
+	Actionable shower;
+	shower.id = 2;
+	shower.reach = 30;
+	shower.room = BATHROOM;
+	shower.action = pee;
+	shower.action_message = "Press 'x' to gain \nsome dignity";
+	shower.position.x = this->w_size.x *0.65;
+	shower.position.y = this->w_size.y *0.66;
+	shower.auto_action = false;
+	shower.visible = false;
+	this->actionables.push_back(shower);
+	if (this->shower_texture.loadFromFile("Images/shower.png")) {
+		printf("shower!\n");
+	}
+	this->shower_sprite.setTexture(this->shower_texture);
+	this->shower_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
+	this->shower_sprite.setPosition(this->w_size.x *0.49, this->w_size.y *0.27);
+	this->shower_anim.length = 4;
+	this->shower_anim.current_frame = 3;
+	this->shower_anim.loop = false;
+	this->shower_anim.inverted = true;
+	this->shower_anim.frame_length = 200;
+	this->shower_anim.rect_size = sf::Vector2i(20, 51);
+	
+
 
 	Actionable bottle;
 	bottle.id = 3;
@@ -695,6 +733,11 @@ void RealLifeGame::update_active(sf::Time time) {
 		}
 		for(int i = 0; i < this->actionables.size(); i++)
 		{
+			if (this->actionables[i].visible) {
+				this->actionables[i].anim.update(time);
+				this->actionables[i].sprite.setTextureRect(this->actionables[i].anim.get_rekt());
+			}
+
 			if(this->actionables[i].isReachable(this->current_room, this->player->real_life_pos.x)) {
 				if (this->actionables[i].auto_action) {
 					this->actionables[i].elapsed += time.asMilliseconds();
@@ -831,7 +874,14 @@ void RealLifeGame::update_active(sf::Time time) {
 	}
 	else if(this->player_state == STARTING_ACTION || this->player_state == ENDING_ACTION){
 		this->player_sprite.setTexture(this->player_texture_acting);
+		if (this->showering) {
+			this->shower_anim.inverted = false;
+		}
 		if(this->player_state == STARTING_ACTION && this->player_animation.current_frame == 3) {
+			if (this->showering) {
+				this->showering = false;
+				this->shower_anim.inverted = true;
+			}
 			this->player_state = ENDING_ACTION;
 			this->player_animation.inverted = true;
 		}
@@ -855,6 +905,9 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->player_sprite.setTextureRect(this->player_animation.get_rekt());
 	this->player_sprite.setPosition(this->player->real_life_pos);
 
+	this->shower_anim.update(time);
+	this->shower_sprite.setTextureRect(this->shower_anim.get_rekt());
+
 	float x = 0;
 	
 	if (this->player_state == SEATED && !this->player->dead) {
@@ -872,13 +925,23 @@ void RealLifeGame::update_active(sf::Time time) {
 
 void RealLifeGame::render(){
 	this->window.draw(this->scene_sprite);
-	this->window.draw(this->player_sprite);
+	if(this->current_room == BATHROOM) {
+		this->window.draw(this->shower_sprite);
+	}
+	if (!this->showering) {
+		this->window.draw(this->player_sprite);
+	}
 	this->window.draw(this->reachables_text);
 	this->window.draw(this->action_text);
+	for (int i = 0; i < this->actionables.size(); i++) {
+		if (this->actionables[i].visible && this->current_room == this->actionables[i].room) {	
+			this->window.draw(this->actionables[i].sprite);
+		}
+	}
 	if (this->current_room == DEN) {
 		this->window.draw(this->vr_sprite);
 		this->window.draw(this->tv_sprite);
-	}
+	} 
 
 	if (this->debug) {
 		this->window.draw(this->debug_text);
@@ -909,6 +972,16 @@ void pee(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player_animation.loop = false;
 	rlg->player_animation.current_frame = 0;
 	rlg->sp->play_from_arcade("pee");
+}
+
+void shower(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player->fuckedness = 0.0;
+	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->showering = true;
+	rlg->sp->play_from_arcade("showering");
 }
 
 void feed(RealLifeGame *rlg, RealLifeGame::Actionable a) {
