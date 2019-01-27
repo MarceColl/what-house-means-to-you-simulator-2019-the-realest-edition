@@ -744,7 +744,8 @@ void RealLifeGame::update_active(sf::Time time) {
 	}
 	else if (once_array[TOGGLE]) {
 		if (this->player_state == SEATED) {
-			this->player->curr_game = ARCADE;			
+			this->player->curr_game = ARCADE;
+			this->sp->fade_out("real_life_track", 1.0);
 		} else {
 			this->selected_reachable = (this->selected_reachable+1) % this->reachable_actionables.size();
 		}
