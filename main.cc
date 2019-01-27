@@ -85,7 +85,7 @@ struct Player {
 
 		this->curr_game = ARCADE;
 
-		this->arcade_pos = sf::Vector2f(W_WIDTH/2, 100.0);
+		this->arcade_pos = sf::Vector2f(W_WIDTH/4, 100.0);
 	}
 };
 
@@ -99,8 +99,17 @@ struct SoundPlayer {
 
 	float immersion;
 
+	struct FadeInOutData {
+		sf::Sound *sound;
+		double start_time;
+		double duration;
+		bool fade_in;
+		bool done;
+	};
+
 	std::queue<sf::Sound*> play_queue;
 	std::queue<sf::Sound*> stop_queue;
+	std::vector<FadeInOutData> fade_inout_queue;
 
  	SoundPlayer() {
 		this->beat = 0;
@@ -145,6 +154,57 @@ struct SoundPlayer {
 				}
 			}
 		}
+
+		for (int i = 0; i < this->fade_inout_queue.size(); ++i) {
+			FadeInOutData *n = &this->fade_inout_queue[i];
+
+			float vol = 100*((this->time - n->start_time)/n->duration);
+			if (!n->fade_in) {
+				vol = 100 - vol;
+			}
+
+			if (vol < 0.5 && !n->fade_in) {
+				n->sound->stop();
+				n->done = true;
+			}
+
+			if (vol >= 100 && n->fade_in) {
+				n->done = true;
+			}
+
+			n->sound->setVolume(vol);
+		}
+
+		for (int i = this->fade_inout_queue.size() - 1; i >= 0; --i) {
+			if (this->fade_inout_queue[i].done) {
+				this->fade_inout_queue.erase(this->fade_inout_queue.begin() + i);
+			}
+		}
+	}
+
+	void fade_out(std::string name, float time) {
+		FadeInOutData d = {
+			.sound = &this->sound[name],
+			.start_time = this->time,
+			.duration = time,
+			.fade_in = false
+		};
+
+		this->fade_inout_queue.push_back(d);
+	}
+
+	void fade_in(std::string name, float time) {
+		FadeInOutData d = {
+			.sound = &this->sound[name],
+			.start_time = this->time,
+			.duration = time,
+			.fade_in = true
+		};
+
+		d.sound->setVolume(0.0);
+		d.sound->play();
+
+		this->fade_inout_queue.push_back(d);
 	}
 
 	void add_layer(std::string name, bool loop) {
@@ -361,7 +421,6 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->player_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->player_sprite.setOrigin(15/float(2), 30/float(2));
 	
-
 	this->vr_sprite.setTexture(this->vr_texture);
 	this->vr_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
 	this->vr_pos_y =  w_size.y / float(st_size.y);
@@ -606,6 +665,7 @@ struct ArcadeGame {
 	bool dj_avail;
 
 	bool menu;
+	int menu_selected;
 
 	int score;
 
@@ -614,9 +674,12 @@ struct ArcadeGame {
 	bool reached_platforms;
 
 	sf::Font action_font;
-	sf::Text reachables_text;
 	sf::Text action_text;
 	sf::Text debug_text;
+
+	sf::Text play_text;
+	sf::Text ranking_text;
+	sf::Text exit_text;
 
 	sf::Vector2f speed;
 
@@ -626,12 +689,20 @@ struct ArcadeGame {
 	sf::VertexArray lines;
 
 	std::vector<Platform> platforms;
+	std::vector<sf::Color> colors;
 
 	int curr_platform;
 
 	ArcadeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), lines(sf::Lines, 2), sp(sp) {
 		this->player = p;
 		this->menu = true;
+		this->menu_selected = 0;
+
+		colors.push_back(sf::Color(255, 0, 255));
+		colors.push_back(sf::Color(125, 0, 125));
+		colors.push_back(sf::Color(75, 0, 75));
+		colors.push_back(sf::Color(30, 0, 30));
+		colors.push_back(sf::Color(0, 0, 0));
 
 		if (!this->action_font.loadFromFile("pixelart.ttf")) {
 			printf("The font was not found!\n");
@@ -644,12 +715,27 @@ struct ArcadeGame {
 		this->action_text.setFillColor(sf::Color::White);
 		this->action_text.setPosition(400, window.getSize().y-50);
 
-		this->init();
+		this->play_text.setFont(this->action_font);
+		this->play_text.setFillColor(sf::Color::White);
+		this->play_text.setPosition(W_WIDTH/2, W_HEIGHT/5.0);
+		this->play_text.setString("PLAY");
 
-		sp->add_layer("Bass 1", true);
+		this->ranking_text.setFont(this->action_font);
+		this->ranking_text.setFillColor(sf::Color::White);
+		this->ranking_text.setPosition(W_WIDTH/2, 2*W_HEIGHT/5.0);
+		this->ranking_text.setString("RANKING");
+
+		this->exit_text.setFont(this->action_font);
+		this->exit_text.setFillColor(sf::Color::White);
+		this->exit_text.setPosition(W_WIDTH/2, 3*W_HEIGHT/5.0);
+		this->exit_text.setString("EXIT");
+
+		this->sp->play_from_arcade("intro_track_arcade");
 	}
 
 	void init() {
+		this->sp->fade_out("intro_track_arcade", 1.0);
+
 		this->current_good = 500.0;
 
 		this->bpm = 1200.0;
@@ -692,6 +778,26 @@ struct ArcadeGame {
 	}
 
 	void update_active(sf::Time dt) {
+		this->time += dt.asSeconds();
+
+		if (this->menu) {
+			if (once_array[RIGHT]) {
+				this->menu_selected = (this->menu_selected + 1)%3;
+			}
+			if (once_array[LEFT]) {
+				this->menu_selected = (this->menu_selected - 1)%3;
+				if (this->menu_selected < 0) {
+					this->menu_selected = 2;
+				}
+			}
+			if (input_array[ACTION]) {
+				this->menu = false;
+				this->init();
+			}
+			
+			return;
+		}
+
 		if (input_array[ACTION]) {
 			if (this->on_platform || this->dj_avail) { 
 				this->speed.y = -800;
@@ -704,18 +810,13 @@ struct ArcadeGame {
 			printf("Exited arcade game\n");
 		}
 		
-		this->time += dt.asSeconds();
-
 		if (this->time > 1.0 && !this->reached_platforms) {
 			this->reached_platforms = true;
 		}
 
-		if (this->current_good > 100 && this->current_good < 150) {
-			sp->add_layer("Kick", true);
-		}
-		if (this->current_good > 150) {
-			sp->add_layer("Snare", true);
-		}
+		sp->add_layer("Kick", true);
+		sp->add_layer("Snare", true);
+		sp->add_layer("Bass 1", true);
 		if (this->current_good > 650 && this->current_good < 750) {
 			sp->add_layer("Lead 1", true);
 			sp->stop_layer("Lead 2", true);
@@ -771,7 +872,6 @@ struct ArcadeGame {
 			pos->y += this->speed.y * dt.asSeconds();
 		}
 
-
 		char buff[100];
 		snprintf(buff, sizeof(buff), "%d", this->score);
 		std::string buffAsStdStr = buff;
@@ -804,11 +904,62 @@ struct ArcadeGame {
 	void update(sf::Time dt) {}
 
 	void render(sf::RenderTarget &target) {
+		if (this->menu) {
+			int color_index;
+
+			sf::RectangleShape rect;
+			color_index = int(sin(this->time*8.0 + 0.5)*5.0);
+
+			rect.setPosition(W_WIDTH/2, W_HEIGHT/2);
+			for (int i = 0; i < 5; ++i) {
+				rect.setFillColor(colors[(i + color_index)%5]);
+				rect.setSize(sf::Vector2f(W_WIDTH - (W_WIDTH/5)*i, W_HEIGHT - (W_HEIGHT/5)*i));
+				rect.setOrigin(sf::Vector2f((W_WIDTH - (W_WIDTH/5)*i)/2, (W_HEIGHT - (W_HEIGHT/5)*i)/2));
+				rect.rotate(color_index*i);
+				target.draw(rect);
+			}
+
+			if (this->menu_selected == 0) {
+				this->play_text.setFillColor(sf::Color(255, 255, 0));
+				sf::FloatRect p_bounds = this->play_text.getGlobalBounds();
+				this->play_text.setOrigin(sf::Vector2f(p_bounds.width/2.0, p_bounds.height/2.0));
+				this->play_text.setPosition(sf::Vector2f(W_WIDTH/2, W_HEIGHT/2 - 5));
+
+				this->ranking_text.setFillColor(sf::Color(255, 255, 255, 128));
+				sf::FloatRect r_bounds = this->ranking_text.getGlobalBounds();
+				this->ranking_text.setOrigin(sf::Vector2f(r_bounds.width/2.0, r_bounds.height/2.0));
+				this->ranking_text.setPosition(sf::Vector2f(3*W_WIDTH/4, W_HEIGHT/2));
+				this->ranking_text.setScale(0.6, 0.6);
+
+				this->exit_text.setFillColor(sf::Color(255, 255, 255, 128));
+				sf::FloatRect e_bounds = this->exit_text.getGlobalBounds();
+				this->exit_text.setOrigin(sf::Vector2f(e_bounds.width/2.0, e_bounds.height/2.0));
+				this->exit_text.setPosition(sf::Vector2f(W_WIDTH/4, W_HEIGHT/2));
+				this->exit_text.setScale(0.6, 0.6);
+			}
+			else if (this->menu_selected == 1) {
+				this->play_text.setFillColor(sf::Color(255, 255, 255));
+				this->ranking_text.setFillColor(sf::Color(255, 255, 0));
+				this->exit_text.setFillColor(sf::Color(255, 255, 255));
+			}
+			else if (this->menu_selected == 2) {
+				this->play_text.setFillColor(sf::Color(255, 255, 255));
+				this->ranking_text.setFillColor(sf::Color(255, 255, 255));
+				this->exit_text.setFillColor(sf::Color(255, 255, 0));
+			}
+
+			target.draw(this->play_text);
+			target.draw(this->ranking_text);
+			target.draw(this->exit_text);
+
+			return;
+		}
+
 		int size = this->platforms.size();
 		for (int i = this->curr_platform; i < size * 2; ++i) {
 			Platform *p = &this->platforms[i%size];
 
-			float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+			float x = p->start * this->ppb + W_WIDTH/4  - this->ppb * this->current_beat;
 
 			if (i > size) {
 				x += size * this->ppb;
@@ -829,7 +980,7 @@ struct ArcadeGame {
 			for (int i = 0; i < size * 2; ++i) {
 				Platform *p = &this->platforms[(this->curr_platform - i)%size];
 
-				float x = p->start * this->ppb + W_WIDTH/2  - this->ppb * this->current_beat;
+				float x = p->start * this->ppb + W_WIDTH/4  - this->ppb * this->current_beat;
 
 				if (i > this->curr_platform) {
 					x -= size * this->ppb;
@@ -962,3 +1113,4 @@ int main() {
 
     return 0;
 }
+
