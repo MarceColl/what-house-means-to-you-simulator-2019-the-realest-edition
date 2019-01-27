@@ -443,6 +443,7 @@ struct RealLifeGame {
 	sf::Text debug_text;
 
 	bool day;
+	sf::Vector2u w_size;
 
 	float mov_speed;
 	float action_reach;
@@ -488,12 +489,12 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 		printf("The bathroom not found!\n");
 	}
 	this->current_room = DEN;
-	sf::Vector2u w_size = window.getSize();
+	this->w_size = window.getSize();
 	sf::Vector2u st_size = this->scene_texture.getSize();
 	this->scene_sprite.setTexture(this->scene_texture);
-	this->scene_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
-	this->player->real_life_pos.x = w_size.x *0.65;
-	this->player->real_life_pos.y = w_size.y *0.66;
+	this->scene_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
+	this->player->real_life_pos.x = this->w_size.x *0.65;
+	this->player->real_life_pos.y = this->w_size.y *0.66;
 	if (!this->player_texture_dead.loadFromFile("Images/dead.png")) {
 		printf("dead not found!\n");
 	}
@@ -531,12 +532,12 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	this->player_animation.rect_size = sf::Vector2i(15, 30);
 	this->player_sprite.setTexture(this->player_texture_seated);
 	this->player_sprite.setTextureRect(this->player_animation.get_rekt());
-	this->player_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
+	this->player_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
 	this->player_sprite.setOrigin(15/float(2), 30/float(2));
 	
 	this->vr_sprite.setTexture(this->vr_texture);
-	this->vr_sprite.setScale(w_size.x / float(st_size.x), w_size.y / float(st_size.y));
-	this->vr_pos_y =  w_size.y / float(st_size.y);
+	this->vr_sprite.setScale(this->w_size.x / float(st_size.x), this->w_size.y / float(st_size.y));
+	this->vr_pos_y =  this->w_size.y / float(st_size.y);
 	this->vr_bottom_pos = 0;
 	this->vr_top_pos = -100;
 
@@ -559,8 +560,8 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.reach = this->action_reach;
 	couch.action = sit;
 	couch.action_message = "Press 'x' to sit on the couch";
-	couch.position.x = w_size.x *0.65;
-	couch.position.y = w_size.y *0.66;
+	couch.position.x = this->w_size.x *0.65;
+	couch.position.y = this->w_size.y *0.66;
 	couch.auto_action = false;
 	couch.visible = false;
 	this->actionables.push_back(couch);
@@ -571,8 +572,8 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	couch.reach = 30;
 	couch.action = feed;
 	couch.action_message = "Press 'x' to feed yourself";
-	couch.position.x = w_size.x *0.25;
-	couch.position.y = w_size.y *0.66;
+	couch.position.x = this->w_size.x *0.25;
+	couch.position.y = this->w_size.y *0.66;
 	couch.auto_action = false;
 	couch.visible = false;
 	this->actionables.push_back(couch);
@@ -583,8 +584,8 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	doritos.room = DEN;
 	doritos.action = crunch;
 	doritos.action_message = "";
-	doritos.position.x = w_size.x *0.54;
-	doritos.position.y = w_size.y *0.66;
+	doritos.position.x = this->w_size.x *0.54;
+	doritos.position.y = this->w_size.y *0.66;
 	doritos.auto_action = true;
 	doritos.action_length = 500;
 	doritos.elapsed = 0;
@@ -598,8 +599,8 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	lavabo.room = BATHROOM;
 	lavabo.action = pee;
 	lavabo.action_message = "Press 'x' to pee";
-	lavabo.position.x = w_size.x *0.90;
-	lavabo.position.y = w_size.y *0.66;
+	lavabo.position.x = this->w_size.x *0.90;
+	lavabo.position.y = this->w_size.y *0.66;
 	lavabo.auto_action = false;
 	lavabo.visible = false;
 	this->actionables.push_back(lavabo);
@@ -610,8 +611,8 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	bottle.room = DEN;
 	bottle.action = pee;
 	bottle.action_message = "Press 'x' to pee in the bottle";
-	bottle.position.x = w_size.x *0.75;
-	bottle.position.y = w_size.y *0.66;
+	bottle.position.x = this->w_size.x *0.75;
+	bottle.position.y = this->w_size.y *0.66;
 	bottle.auto_action = false;
 	bottle.visible = false;
 	this->actionables.push_back(bottle);
@@ -621,7 +622,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	}
 
 	this->debug_text.setFont(this->action_font);
-	this->debug_text.setPosition(0, w_size.y-50);
+	this->debug_text.setPosition(0, this->w_size.y-50);
 	this->action_text.setFont(this->action_font);
 	this->action_text.setFillColor(sf::Color::White);
 	this->reachables_text.setFont(this->action_font);
@@ -662,7 +663,6 @@ void RealLifeGame::update_active(sf::Time time) {
 		this->player_texture_acting = this->player_texture_acting_night;
 		this->player_texture_walking = this->player_texture_walking_night;
 	}
-	sf::Vector2u w_size = window.getSize();
 	/// ACTIONABLES
 	this->reachable_actionables.clear();
 	// IF DUDE IS NOT SITTING, LET HIM DO SHITE
@@ -741,10 +741,10 @@ void RealLifeGame::update_active(sf::Time time) {
 				} else {
 					this->current_room = BATHROOM;
 					this->scene_sprite.setTexture(this->bathroom_texture);
-					this->player->real_life_pos.x = w_size.x*0.85;
+					this->player->real_life_pos.x = this->w_size.x*0.85;
 				}
 			} else {
-				if(this->player->real_life_pos.x > w_size.x*0.6) {
+				if(this->player->real_life_pos.x > this->w_size.x*0.6) {
 					this->player->real_life_pos.x = this->player->real_life_pos.x - this->mov_speed * time.asSeconds();
 				}
 			}
@@ -759,14 +759,14 @@ void RealLifeGame::update_active(sf::Time time) {
 		}
 		if (this->player_state == WALKING) {
 			if (this->current_room == DEN) {
-				if(this->player->real_life_pos.x < w_size.x * 0.95) {
+				if(this->player->real_life_pos.x < this->w_size.x * 0.95) {
 					this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
 				}
 			} else {
-				if(this->player->real_life_pos.x > w_size.x*0.99) {
+				if(this->player->real_life_pos.x > this->w_size.x*0.99) {
 					this->current_room = DEN;
 					this->scene_sprite.setTexture(this->scene_texture);
-					this->player->real_life_pos.x = w_size.x*0.1;
+					this->player->real_life_pos.x = this->w_size.x*0.1;
 				} else {
 					this->player->real_life_pos.x = this->player->real_life_pos.x + this->mov_speed * time.asSeconds();
 				}
@@ -836,7 +836,7 @@ void RealLifeGame::update_active(sf::Time time) {
 	float x = 0;
 	
 	if (this->player_state == SEATED && !this->player->dead) {
-		x = this->player->real_life_pos.x - w_size.x*0.66;
+		x = this->player->real_life_pos.x - this->w_size.x*0.66;
 	} else {
 		x = this->vr_sprite.getPosition().x;
 	}
@@ -909,6 +909,7 @@ struct ArcadeGame {
 		bool played;
 	};
 
+	sf::Vector2u w_size;
 	Player *player;
 	SoundPlayer *sp;
 	sf::RenderWindow &window;
@@ -987,11 +988,11 @@ struct ArcadeGame {
 		}
 
 		this->debug_text.setFont(this->action_font);
-		this->debug_text.setPosition(0, window.getSize().y-50);
+		this->debug_text.setPosition(0, this->w_size.y-50);
 
 		this->action_text.setFont(this->action_font);
 		this->action_text.setFillColor(sf::Color::White);
-		this->action_text.setPosition(400, window.getSize().y-50);
+		this->action_text.setPosition(400, this->w_size.y-50);
 
 		this->play_text.setFont(this->action_font);
 		this->play_text.setFillColor(sf::Color::White);
