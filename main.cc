@@ -76,6 +76,8 @@ struct Player {
 	// 0.0 -> 1.0
 	float hygiene_need;
 
+	float fuckedness;
+
 	int curr_game_points;
 	int high_score;
 
@@ -93,6 +95,8 @@ struct Player {
 		this->pee_need = 0.0;
 		this->hunger_need = 0.0;
 		this->hygiene_need = 0.0;
+
+		this->fuckedness = 0.0;
 
 		this->curr_game_points = 0;
 		this->high_score = 0;
@@ -133,6 +137,7 @@ struct SoundPlayer {
 		this->add_track("intro_track_arcade", "./Tracks/Intro Arcade.ogg");
 		this->add_track("real_life_track", "./Tracks/Real Life Soundscape.ogg");
 		this->sound["real_life_track"].setLoop(true);
+		this->add_track("cough", "./FX/FX_Cough.ogg");
 		this->add_track("crunch", "./FX/FX_Crunch.ogg");
 		this->add_track("pee_need", "./FX/FX_Pee Need.ogg");
 		this->add_track("eat", "./FX/FX_Eat.ogg");
@@ -414,6 +419,10 @@ struct RealLifeGame {
 	std::vector<Actionable> actionables;
 	std::vector<Actionable> reachable_actionables;
 	int selected_reachable;
+
+	float timer_after_death;
+	bool tad_started;
+	bool credits;
 	
 	sf::Texture tv_texture;
 	sf::Sprite tv_sprite;
@@ -433,7 +442,6 @@ struct RealLifeGame {
 	float vr_top_pos;
 	float vr_bottom_pos;
 	float vr_pos_y;
-
 
 	sf::Texture player_texture_dead;
 	sf::Texture player_texture_acting;
@@ -484,6 +492,8 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pee(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void shower(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void feed(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void pee_bottle(RealLifeGame *rlg, RealLifeGame::Actionable a);
+void feed_ground(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void crunch(RealLifeGame *rlg, RealLifeGame::Actionable a);
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a);
 
@@ -493,6 +503,10 @@ bool RealLifeGame::Actionable::isReachable(Room r, float x) {
 }
 
 RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp): window(window), actionables(0), sp(sp) {
+	this->timer_after_death = 0.0;
+	this->tad_started = false;
+	this->credits = false;
+
 	this->player = p;
 	this->showering = false;
 	if (!this->scene_texture_day.loadFromFile("Images/room_dia.png")) {
@@ -616,7 +630,20 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	doritos.elapsed = 0;
 	doritos.visible = false;
 	this->actionables.push_back(doritos);
-
+	
+	Actionable doritos_feed;
+	doritos_feed.id = 1;
+	doritos_feed.reach = 40;
+	doritos_feed.room = DEN;
+	doritos_feed.action = feed_ground;
+	doritos_feed.action_message = "Press 'x' to feed yourself";
+	doritos_feed.position.x = this->w_size.x *0.54;
+	doritos_feed.position.y = this->w_size.y *0.66;
+	doritos_feed.auto_action = false;
+	doritos_feed.action_length = 500;
+	doritos_feed.elapsed = 0;
+	doritos_feed.visible = false;
+	this->actionables.push_back(doritos_feed);
 
 
 
@@ -662,7 +689,7 @@ RealLifeGame::RealLifeGame(Player *p, sf::RenderWindow &window, SoundPlayer *sp)
 	bottle.id = 3;
 	bottle.reach = 20;
 	bottle.room = DEN;
-	bottle.action = pee;
+	bottle.action = pee_bottle;
 	bottle.action_message = "Press 'x' to pee in the bottle";
 	bottle.position.x = this->w_size.x *0.75;
 	bottle.position.y = this->w_size.y *0.66;
@@ -700,11 +727,15 @@ void RealLifeGame::update_debug(){
 }
 
 void RealLifeGame::update(sf::Time time) {
-	this->player->hunger_need += 0.01 * time.asSeconds();
+	this->player->hunger_need += 0.05 * time.asSeconds();
 	this->player->pee_need += 0.05 * time.asSeconds();
 
 	if (this->player->pee_need > 0.8) {
 		this->sp->play_from_real_life("pee_need");
+	}
+
+	if (this->player->pee_need > 1.0 && this->player->hunger_need > 1.0) {
+		this->player->dead = true;
 	}
 
 	this->day = !this->day;
@@ -727,6 +758,10 @@ void RealLifeGame::update_active(sf::Time time) {
 	this->reachable_actionables.clear();
 	// IF DUDE IS NOT SITTING, LET HIM DO SHITE
 	if(this->player_state != SEATED) {
+		if (this->player->dead) {
+			this->tad_started = true;
+		}
+
 		//VR headset
 		if (this->vr_pos_y > this->vr_top_pos) {
 			this->vr_pos_y -= time.asMilliseconds();
@@ -871,6 +906,14 @@ void RealLifeGame::update_active(sf::Time time) {
 	if (this->player->dead) {
 		this->player_sprite.setTexture(this->player_texture_dead);
 		this->player_animation.current_frame = 0;
+
+		if (this->tad_started) {
+			this->timer_after_death += time.asSeconds();
+
+			if (this->timer_after_death > 4.0) {
+				this->credits = true;
+			}
+		}
 	}
 	else if(this->player_state == STARTING_ACTION || this->player_state == ENDING_ACTION){
 		this->player_sprite.setTexture(this->player_texture_acting);
@@ -924,6 +967,10 @@ void RealLifeGame::update_active(sf::Time time) {
 }
 
 void RealLifeGame::render(){
+	if (this->credits) {
+		return;
+	}
+
 	this->window.draw(this->scene_sprite);
 	if(this->current_room == BATHROOM) {
 		this->window.draw(this->shower_sprite);
@@ -946,6 +993,11 @@ void RealLifeGame::render(){
 	if (this->debug) {
 		this->window.draw(this->debug_text);
 	}
+
+	sf::RectangleShape cover;
+	cover.setSize(sf::Vector2f(W_WIDTH, W_HEIGHT));
+	cover.setFillColor(sf::Color(0, 0, 0, 255 * (this->timer_after_death/4.0)));
+	this->window.draw(cover);
 }
 
 void pay_bills(RealLifeGame *rlg, RealLifeGame::Actionable a){
@@ -967,6 +1019,17 @@ void sit(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 
 void pee(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player->pee_need = 0.0;
+	rlg->player->fuckedness -= 0.3;
+	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->sp->play_from_arcade("pee");
+}
+
+void pee_bottle(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player->pee_need = 0.0;
+	rlg->player->fuckedness += 0.5;
 	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
 	rlg->player_animation.inverted = false;
 	rlg->player_animation.loop = false;
@@ -986,6 +1049,17 @@ void shower(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 
 void feed(RealLifeGame *rlg, RealLifeGame::Actionable a) {
 	rlg->player->hunger_need = 0.0;
+	rlg->player->fuckedness -= 0.5;
+	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
+	rlg->player_animation.inverted = false;
+	rlg->player_animation.loop = false;
+	rlg->player_animation.current_frame = 0;
+	rlg->sp->play_from_arcade("eat");
+}
+
+void feed_ground(RealLifeGame *rlg, RealLifeGame::Actionable a) {
+	rlg->player->hunger_need = 0.0;
+	rlg->player->fuckedness += 0.5;
 	rlg->player_state = RealLifeGame::PlayerState::STARTING_ACTION;
 	rlg->player_animation.inverted = false;
 	rlg->player_animation.loop = false;
@@ -1162,7 +1236,6 @@ struct ArcadeGame {
 	}
 
 	void update_active(sf::Time dt) {
-		printf("%f\n", dt.asSeconds());
 		this->time += dt.asSeconds();
 
 		if (this->menu) {
@@ -1197,7 +1270,7 @@ struct ArcadeGame {
 			return;
 		}
 
-		if (input_array[ACTION]) {
+		if (input_array[ACTION] && !this->player->dead) {
 			if (this->on_platform || this->dj_avail) { 
 				this->speed.y = -800;
 				this->on_platform = false;
@@ -1294,7 +1367,7 @@ struct ArcadeGame {
 			if (this->score > this->player->high_score) {
 				this->player->high_score = this->score;
 			}
-			this->player->hunger_need += 0.1;
+			this->player->hunger_need += 0.2;
 			sp->play_from_arcade("FX_Gameover");
 			this->current_good -= 400;
 
@@ -1582,10 +1655,11 @@ int main() {
 			window.draw(sc_sprite, &bloom);
 		}
 
-		/*
-		window.draw(notif_sq);
-		window.draw(notif_text);
-		*/
+		if (player.fuckedness >= 0.5) {
+			if (std::rand()%500 == 0) {
+				sp.play_from_real_life("cough");
+			}
+		}
 
 		for (int i = 0; i < INPUT_COUNT; i++) {
 			once_array[i] = false;
