@@ -297,7 +297,17 @@ struct SoundPlayer {
 	}
 
 	void play_from_real_life(std::string name) {
-		// this->sound[name].setVolume(100.0 - this->immersion);
+		if (name == "fart") {
+			printf("DEADDDD");
+			this->sound["Kick"].stop();
+			this->sound["Snare"].stop();
+			this->sound["Bass 1"].stop();
+			this->sound["pee_need"].stop();
+			this->sound["FX_Gameover"].stop();
+
+			this->sound[name].setPitch(0.2);
+		}
+
 		if (this->sound[name].getStatus() != sf::SoundSource::Status::Playing) {
 			this->sound[name].play();
 		}
@@ -692,12 +702,15 @@ void RealLifeGame::update(sf::Time time) {
 	this->player->hunger_need += 0.05 * time.asSeconds();
 	this->player->pee_need += 0.05 * time.asSeconds();
 
-	if (this->player->pee_need > 0.8) {
+	if (this->player->pee_need > 0.8 && !this->player->dead) {
 		this->sp->play_from_real_life("pee_need");
 	}
 
-	if (this->player->pee_need > 1.0 && this->player->hunger_need > 1.0) {
+	if (this->player->pee_need > 1.0 
+		&& this->player->hunger_need > 1.0 
+		&& !this->player->dead) {
 		this->player->dead = true;
+		this->sp->play_from_real_life("fart");
 	}
 
 	this->day = !this->day;
@@ -1218,18 +1231,20 @@ struct ArcadeGame {
 			this->reached_platforms = true;
 		}
 
-		sp->add_layer("Kick", true);
-		sp->add_layer("Snare", true);
-		sp->add_layer("Bass 1", true);
-		if (this->current_good > 650 && this->current_good < 750) {
-			sp->add_layer("Lead 1", true);
-			sp->stop_layer("Lead 2", true);
-			sp->stop_layer("Lead 3", true);
-		}
-		if (this->current_good >= 750 && this->current_good < 850) {
-			sp->add_layer("Lead 2", true);
-			sp->stop_layer("Lead 1", true);
-			sp->stop_layer("Lead 3", true);
+		if (!this->player->dead) {
+			sp->add_layer("Kick", true);
+			sp->add_layer("Snare", true);
+			sp->add_layer("Bass 1", true);
+			if (this->current_good > 650 && this->current_good < 750) {
+				sp->add_layer("Lead 1", true);
+				sp->stop_layer("Lead 2", true);
+				sp->stop_layer("Lead 3", true);
+			}
+			if (this->current_good >= 750 && this->current_good < 850) {
+				sp->add_layer("Lead 2", true);
+				sp->stop_layer("Lead 1", true);
+				sp->stop_layer("Lead 3", true);
+			}
 		}
 
 		this->current_beat += (this->bpm/60)*dt.asSeconds();
@@ -1295,7 +1310,10 @@ struct ArcadeGame {
 				this->player->high_score = this->score;
 			}
 			this->player->hunger_need += 0.2;
-			sp->play_from_arcade("FX_Gameover");
+
+			if (!this->player->dead) {
+				sp->play_from_arcade("FX_Gameover");
+			}
 			this->current_good -= 400;
 
 			sp->stop_layer("Lead 1", true);
